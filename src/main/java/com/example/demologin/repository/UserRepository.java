@@ -1,12 +1,12 @@
 package com.example.demologin.repository;
 
-import com.example.demologin.entity.User;
-import lombok.AllArgsConstructor;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.Optional;
+import com.example.demologin.entity.User;
 
 
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -17,7 +17,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmailAndUserIdNot(String email, Long userId);
 
 
-    Page<User> findByRoles_Name(String roleName, Pageable pageable);
+    Page<User> findByRole_Name(String roleName, Pageable pageable);
 
-    boolean existsByRoles_Id(Long id);
+    boolean existsByRole_Id(Long id);
 }

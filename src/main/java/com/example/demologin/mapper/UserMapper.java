@@ -1,18 +1,17 @@
 package com.example.demologin.mapper;
 
+import org.springframework.stereotype.Component;
+
 import com.example.demologin.dto.request.user.UserRequest;
 import com.example.demologin.dto.response.LoginResponse;
 import com.example.demologin.dto.response.MemberResponse;
-import com.example.demologin.dto.response.UserResponse;
 import com.example.demologin.entity.User;
 import com.example.demologin.enums.UserStatus;
-import org.springframework.stereotype.Component;
 
 @Component
 public class UserMapper {
     public MemberResponse toUserResponse(User user) {
-        // Lấy role đầu tiên nếu có
-        String roleName = user.getRoles().stream().findFirst().map(r -> r.getName()).orElse("");
+    String roleName = user.getRole() != null ? user.getRole().getName() : "";
         return new MemberResponse(
                 user.getUserId(),
                 user.getUsername(),

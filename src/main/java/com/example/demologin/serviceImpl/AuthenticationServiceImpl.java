@@ -1,32 +1,15 @@
 package com.example.demologin.serviceImpl;
 
-import com.example.demologin.dto.request.login.FacebookLoginRequest;
-import com.example.demologin.dto.request.login.GoogleLoginRequest;
-import com.example.demologin.dto.request.login.LoginRequest;
-import com.example.demologin.dto.request.user.UserRegistrationRequest;
-import com.example.demologin.dto.response.LoginResponse;
-import com.example.demologin.dto.response.LoginResponse;
-import com.example.demologin.entity.RefreshToken;
-import com.example.demologin.entity.User;
-import com.example.demologin.entity.UserActivityLog;
-import com.example.demologin.enums.ActivityType;
-import com.example.demologin.enums.Gender;
-import com.example.demologin.enums.UserStatus;
-import com.example.demologin.exception.exceptions.*;
-import com.example.demologin.mapper.UserMapper;
-import com.example.demologin.repository.RefreshTokenRepository;
-import com.example.demologin.repository.UserActivityLogRepository;
-import com.example.demologin.repository.UserRepository;
-import com.example.demologin.repository.RoleRepository;
-import com.example.demologin.service.AuthenticationService;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Map;
 
-
-import com.example.demologin.service.RefreshTokenService;
-import com.example.demologin.service.TokenService;
-import com.example.demologin.utils.EmailUtils;
-import lombok.AllArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
@@ -36,27 +19,47 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
+
+import com.example.demologin.dto.request.login.FacebookLoginRequest;
+import com.example.demologin.dto.request.login.GoogleLoginRequest;
+import com.example.demologin.dto.request.login.LoginRequest;
+import com.example.demologin.dto.request.user.UserRegistrationRequest;
+import com.example.demologin.dto.response.LoginResponse;
+import com.example.demologin.entity.RefreshToken;
+import com.example.demologin.entity.User;
+import com.example.demologin.entity.UserActivityLog;
+import com.example.demologin.enums.ActivityType;
+import com.example.demologin.enums.Gender;
+import com.example.demologin.enums.UserStatus;
+import com.example.demologin.exception.exceptions.BadRequestException;
+import com.example.demologin.exception.exceptions.ConflictException;
+import com.example.demologin.exception.exceptions.ForbiddenException;
+import com.example.demologin.exception.exceptions.InternalServerErrorException;
+import com.example.demologin.exception.exceptions.NotFoundException;
+import com.example.demologin.exception.exceptions.UnauthorizedException;
+import com.example.demologin.exception.exceptions.ValidationException;
+import com.example.demologin.mapper.UserMapper;
+import com.example.demologin.repository.RoleRepository;
+import com.example.demologin.repository.UserActivityLogRepository;
+import com.example.demologin.repository.UserRepository;
+import com.example.demologin.service.AuthenticationService;
+import com.example.demologin.service.RefreshTokenService;
+import com.example.demologin.service.TokenService;
+import com.example.demologin.utils.EmailUtils;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+
 import lombok.extern.slf4j.Slf4j;
-import java.time.LocalDate;
-import java.util.HashSet;
-import java.util.Map;
-import java.time.LocalDateTime;
-import java.util.Set;
 
 @Service
 @Slf4j
 public class AuthenticationServiceImpl implements AuthenticationService {
+    private static final String DEFAULT_ROLE = "SHIPPER";
+
     @Value("${spring.security.oauth2.client.registration.google.client-id}")
     private String GOOGLE_CLIENT_ID;
 
@@ -101,10 +104,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             }
             
             // Role validation
-            com.example.demologin.entity.Role memberRole = roleRepository.findByName("MEMBER")
-                .orElseThrow(() -> new NotFoundException("Role MEMBER not found"));
-            Set<com.example.demologin.entity.Role> roles = new HashSet<>();
-            roles.add(memberRole);
+            com.example.demologin.entity.Role memberRole = roleRepository.findByName(DEFAULT_ROLE)
+                .orElseThrow(() -> new NotFoundException("Role " + DEFAULT_ROLE + " not found"));
             
             User newUser = new User(
                     request.getUsername(),
@@ -119,7 +120,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             newUser.setDateOfBirth(request.getDateOfBirth());
             newUser.setGender(request.getGender());
             newUser.setIdentityCard(request.getIdentityCard());
-            newUser.setRoles(roles);
+            newUser.setRole(memberRole);
             newUser.setStatus(UserStatus.ACTIVE);
             
             User savedUser = userRepository.save(newUser);
@@ -224,32 +225,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             
             Payload payload = idToken.getPayload();
             String email = payload.getEmail();
-            String name = (String) payload.get("name");
-            
-            User user = userRepository.findByEmail(email).orElse(null);
-            if (user == null) {
-                Set<com.example.demologin.entity.Role> roles = new HashSet<>();
-                roles.add(roleRepository.findByName("MEMBER").orElseThrow(() -> new NotFoundException("Role MEMBER not found")));
-                
-                user = new User(
-                        email.substring(0, email.indexOf('@')),
-                        passwordEncoder.encode(""),
-                        name != null ? name : "",
-                        email,
-                        "",
-                        ""
-                );
-                
-                user.setRoles(roles);
-                user.setStatus(UserStatus.ACTIVE);
-                user.setCreatedAt(LocalDateTime.now());
-                user.setIdentityCard("");
-                user.setDateOfBirth(LocalDateTime.now().toLocalDate());
-                user.setGender(com.example.demologin.enums.Gender.OTHER);
-                user.setVerify(true);
-                user.setStatus(UserStatus.ACTIVE);
-                user = userRepository.save(user);
-            }
+                User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new UnauthorizedException(
+                        "Google account is not registered in system. Please contact admin."));
             
             String token = tokenService.generateTokenForUser(user);
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
@@ -393,8 +371,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         try {
             User user = userRepository.findByEmail(email).orElse(null);
             if (user == null) {
-                Set<com.example.demologin.entity.Role> roles = new HashSet<>();
-                roles.add(roleRepository.findByName("MEMBER").orElseThrow(() -> new NotFoundException("Role MEMBER not found")));
+                com.example.demologin.entity.Role memberRole = roleRepository.findByName(DEFAULT_ROLE)
+                    .orElseThrow(() -> new NotFoundException("Role " + DEFAULT_ROLE + " not found"));
                 
                 user = new User(
                         email.substring(0, email.indexOf('@')),
@@ -405,7 +383,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                         location != null ? location : ""
                 );
                 
-                user.setRoles(roles);
+                user.setRole(memberRole);
                 user.setStatus(UserStatus.ACTIVE);
                 user.setCreatedAt(LocalDateTime.now());
                 user.setIdentityCard("");
@@ -424,8 +402,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     user.setAddress(location);
                     updated = true;
                 }
-                if (!user.getRoles().stream().anyMatch(r -> r.getName().equals("MEMBER"))) {
-                    user.addRole(roleRepository.findByName("MEMBER").orElseThrow(() -> new NotFoundException("Role MEMBER not found")));
+                if (user.getRole() == null || !DEFAULT_ROLE.equals(user.getRole().getName())) {
+                    user.setRole(roleRepository.findByName(DEFAULT_ROLE)
+                            .orElseThrow(() -> new NotFoundException("Role " + DEFAULT_ROLE + " not found")));
                     updated = true;
                 }
                 if (user.getStatus() != UserStatus.ACTIVE) {
@@ -480,30 +459,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public LoginResponse getUserResponse(String email, String name) {
-        User user = userRepository.findByEmail(email).orElse(null);
-        if (user == null) {
-            Set<com.example.demologin.entity.Role> roles = new HashSet<>();
-            roles.add(roleRepository.findByName("MEMBER").orElseThrow(() -> new NotFoundException("Role MEMBER not found")));
-            
-            user = new User(
-                    email.substring(0, email.indexOf('@')),
-                    passwordEncoder.encode(""),
-                    name != null ? name : "",
-                    email,
-                    "",
-                    ""
-            );
-            
-            user.setStatus(UserStatus.ACTIVE);
-            user.setCreatedAt(LocalDateTime.now());
-            user.setIdentityCard("");
-            user.setDateOfBirth(LocalDateTime.now().toLocalDate());
-            user.setGender(Gender.OTHER);
-            user.setRoles(roles);
-            user.setVerify(true);
-            user.setRoles(roles);
-            user = userRepository.save(user);
-        }
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new UnauthorizedException(
+                "OAuth account is not registered in system. Please contact admin."));
 
 
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);

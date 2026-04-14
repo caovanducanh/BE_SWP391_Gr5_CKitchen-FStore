@@ -1,15 +1,31 @@
 # Tài khoản mặc định
 
-Hệ thống khởi tạo sẵn 2 tài khoản mẫu:
+Hệ thống khởi tạo sẵn các tài khoản mẫu:
 
 - **Admin**
   - username: `admin`
   - password: `admin123`
   - role: `ADMIN`
-- **Member**
-  - username: `member`
-  - password: `member123`
-  - role: `MEMBER`
+- **Manager**
+  - username: `manager`
+  - password: `manager123`
+  - role: `MANAGER`
+- **Supply Coordinator**
+  - username: `supply`
+  - password: `supply123`
+  - role: `SUPPLY_COORDINATOR`
+- **Central Kitchen Staff**
+  - username: `kitchen`
+  - password: `kitchen123`
+  - role: `CENTRAL_KITCHEN_STAFF`
+- **Franchise Store Staff**
+  - username: `storestaff`
+  - password: `store123`
+  - role: `FRANCHISE_STORE_STAFF`
+- **Shipper**
+  - username: `shipper`
+  - password: `shipper123`
+  - role: `SHIPPER`
 
 Bạn có thể dùng các tài khoản này để đăng nhập và test các API phân quyền.
 
@@ -100,6 +116,7 @@ Các API xác thực, đăng nhập, đăng ký, làm mới token, đăng nhập
 
 ## 4. Đăng nhập Google
 - **Endpoint:** `POST /api/google-login`
+- **Lưu ý:** Không tự tạo tài khoản mới qua Google. Email Google phải tồn tại sẵn trong hệ thống.
 - **Request:**
 ```json
 {

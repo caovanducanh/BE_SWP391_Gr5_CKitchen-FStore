@@ -1,19 +1,33 @@
 package com.example.demologin.entity;
 
-import com.example.demologin.enums.Gender;
-import com.example.demologin.enums.UserStatus;
-import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Set;
+
 import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+import com.example.demologin.enums.Gender;
+import com.example.demologin.enums.UserStatus;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "users")
@@ -28,13 +42,9 @@ public class User implements UserDetails {
     @Column(nullable = false, length = 128)
     private String password;
 
-    @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(
-        name = "user_roles",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "role_id")
-    )
-    private Set<Role> roles = new HashSet<>();
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "role_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    private Role role;
 
     @Column(nullable = false, length = 100)
     private String fullName;
@@ -87,7 +97,6 @@ public class User implements UserDetails {
         this.phone = phone;
         this.address = address;
         this.locked = false;
-        this.roles = new HashSet<>();
     }
 
     public boolean isLocked() {
@@ -99,18 +108,24 @@ public class User implements UserDetails {
     }
 
     public Set<Role> getRoles() {
-        return roles;
+        return role == null ? Collections.emptySet() : Collections.singleton(role);
+    }
+
+    public Role getRole() {
+        return role;
     }
 
     public Set<String> getPermissionCodes() {
-        return roles.stream()
-            .flatMap(r -> r.getPermissions().stream())
-            .map(Permission::getCode)
-            .collect(java.util.stream.Collectors.toSet());
+        if (role == null || role.getPermissions() == null) {
+            return Collections.emptySet();
+        }
+        return role.getPermissions().stream()
+                .map(Permission::getCode)
+                .collect(java.util.stream.Collectors.toSet());
     }
 
     public void addRole(Role role) {
-        this.roles.add(role);
+        this.role = role;
     }
 
     @Override
@@ -153,6 +168,7 @@ public class User implements UserDetails {
         this.userId = userId;
     }
     
+    @Override
     public String getUsername() {
         return username;
     }
@@ -251,16 +267,20 @@ public class User implements UserDetails {
     }
     
     public void setRoles(Set<Role> roles) {
-        this.roles = roles;
+        this.role = (roles == null || roles.isEmpty()) ? null : roles.iterator().next();
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         Collection<SimpleGrantedAuthority> authorities = new ArrayList<>();
-        for (Role role : this.roles) {
-            authorities.add(new SimpleGrantedAuthority(role.getName()));
-            if (role.getPermissions() != null) {
-                for (Permission perm : role.getPermissions()) {
+        if (this.role != null) {
+            authorities.add(new SimpleGrantedAuthority(this.role.getName()));
+            if (this.role.getPermissions() != null) {
+                for (Permission perm : this.role.getPermissions()) {
                     authorities.add(new SimpleGrantedAuthority(perm.getCode()));
                 }
             }

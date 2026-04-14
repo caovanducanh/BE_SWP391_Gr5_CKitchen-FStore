@@ -1,5 +1,9 @@
 package com.example.demologin.serviceImpl;
 
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
 import com.example.demologin.dto.request.role.CreateRoleRequest;
 import com.example.demologin.dto.request.role.RolePermissionsRequest;
 import com.example.demologin.dto.request.role.UpdateRoleRequest;
@@ -11,9 +15,8 @@ import com.example.demologin.mapper.RoleMapper;
 import com.example.demologin.repository.RoleRepository;
 import com.example.demologin.repository.UserRepository;
 import com.example.demologin.service.RoleService;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -58,7 +61,7 @@ public class RoleServiceImpl implements RoleService {
         Role r = roleRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Role with id " + id + " not found"));
 
-        if (userRepository.existsByRoles_Id(id)) {
+        if (userRepository.existsByRole_Id(id)) {
             throw new BusinessException("Role is assigned to users. Cannot delete.");
         }
 

@@ -1,20 +1,20 @@
 package com.example.demologin.initializer.components;
 
+import java.time.LocalDate;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.example.demologin.entity.Role;
 import com.example.demologin.entity.User;
 import com.example.demologin.enums.Gender;
 import com.example.demologin.enums.UserStatus;
 import com.example.demologin.repository.RoleRepository;
 import com.example.demologin.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * Default User Initializer
@@ -34,11 +34,6 @@ public class DefaultUserInitializer {
     @Transactional
     public void initializeDefaultUsers() {
         log.info("👥 Initializing default system users...");
-        
-        if (userRepository.count() > 0) {
-            log.info("ℹ️ Users already exist, skipping user initialization");
-            return;
-        }
 
         createDefaultUsers();
         
@@ -49,7 +44,11 @@ public class DefaultUserInitializer {
         log.debug("👤 Creating default system users...");
         
         createUser("admin", "admin123", "ADMIN");
-        createUser("member", "member123", "MEMBER");
+        createUser("manager", "manager123", "MANAGER");
+        createUser("supply", "supply123", "SUPPLY_COORDINATOR");
+        createUser("kitchen", "kitchen123", "CENTRAL_KITCHEN_STAFF");
+        createUser("storestaff", "store123", "FRANCHISE_STORE_STAFF");
+        createUser("shipper", "shipper123", "SHIPPER");
         
         log.debug("✅ Created {} users", userRepository.count());
     }
@@ -63,9 +62,6 @@ public class DefaultUserInitializer {
         Role role = roleRepository.findByName(roleName)
             .orElseThrow(() -> new IllegalStateException("Role '" + roleName + "' not found. PermissionRoleInitializer must run first."));
         
-        Set<Role> roles = new HashSet<>();
-        roles.add(role);
-        
         User user = new User(
                 username,
                 passwordEncoder.encode(rawPassword),
@@ -76,7 +72,7 @@ public class DefaultUserInitializer {
         );
         
         // Set additional properties
-        user.setRoles(roles);
+        user.setRole(role);
         user.setIdentityCard("123456789");
         user.setDateOfBirth(LocalDate.of(1995, 1, 1));
         user.setStatus(UserStatus.ACTIVE);

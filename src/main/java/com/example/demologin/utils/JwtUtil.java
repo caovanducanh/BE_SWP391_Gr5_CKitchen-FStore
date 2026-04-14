@@ -1,20 +1,5 @@
 package com.example.demologin.utils;
 
-import com.example.demologin.entity.RefreshToken;
-import com.example.demologin.entity.User;
-import com.example.demologin.exception.exceptions.TokenValidationException;
-import com.example.demologin.repository.RefreshTokenRepository;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
-import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
@@ -23,7 +8,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
+
+import javax.crypto.SecretKey;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import com.example.demologin.entity.RefreshToken;
+import com.example.demologin.entity.User;
+import com.example.demologin.exception.exceptions.TokenValidationException;
+import com.example.demologin.repository.RefreshTokenRepository;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * JWT Utility class for token operations
@@ -62,10 +64,10 @@ public class JwtUtil {
         Map<String, Object> claims = new HashMap<>();
         claims.put("tokenVersion", user.getTokenVersion());
 
-        // Only store role names, not full objects
-        Set<String> roleNames = user.getRoles().stream()
-                .map(role -> role.getName())
-                .collect(Collectors.toSet());
+        // Keep roles claim as a set for backward compatibility, but user now has exactly one role.
+        Set<String> roleNames = user.getRole() == null
+            ? new HashSet<>()
+            : Set.of(user.getRole().getName());
         claims.put("roles", roleNames);
 
         claims.put("fullName", user.getFullName());

@@ -1,16 +1,20 @@
 package com.example.demologin.initializer.components;
 
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.example.demologin.entity.Permission;
 import com.example.demologin.entity.Role;
 import com.example.demologin.repository.PermissionRepository;
 import com.example.demologin.repository.RoleRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Permission and Role Initializer
@@ -49,14 +53,17 @@ public class PermissionRoleInitializer {
 
     private static final String USER_VIEW_OWN_LOGIN_HISTORY = "USER_VIEW_OWN_LOGIN_HISTORY";
 
+        // ===================== ROLE NAMES =====================
+        private static final String ROLE_ADMIN = "ADMIN";
+        private static final String ROLE_MANAGER = "MANAGER";
+        private static final String ROLE_SUPPLY_COORDINATOR = "SUPPLY_COORDINATOR";
+        private static final String ROLE_CENTRAL_KITCHEN_STAFF = "CENTRAL_KITCHEN_STAFF";
+        private static final String ROLE_FRANCHISE_STORE_STAFF = "FRANCHISE_STORE_STAFF";
+        private static final String ROLE_SHIPPER = "SHIPPER";
+
     @Transactional
     public void initializePermissionsAndRoles() {
         log.info("🔑 Initializing system permissions and roles...");
-
-        if (permissionRepository.count() > 0) {
-            log.info("ℹ️ Permissions already exist, skipping initialization");
-            return;
-        }
 
         createPermissions();
         createRoles();
@@ -68,30 +75,33 @@ public class PermissionRoleInitializer {
     private void createPermissions() {
         log.debug("📋 Creating system permissions...");
 
-        List<Permission> permissions = Arrays.asList(
-                new Permission(USER_MANAGE, "Quản lý user (Admin)"),
-                new Permission(USER_TOKEN_MANAGEMENT, "Quản lý token của user"),
-                new Permission(TOKEN_INVALIDATE_OWN, "Hủy token của bản thân"),
-                new Permission(TOKEN_INVALIDATE_USER, "Hủy token của user cụ thể"),
-                new Permission(TOKEN_VIEW_OWN, "Xem token version của bản thân"),
-                new Permission(TOKEN_VIEW_USER, "Xem token version của user cụ thể"),
-                new Permission(ROLE_VIEW, "Xem vai trò"),
-                new Permission(ROLE_CREATE, "Tạo vai trò"),
-                new Permission(ROLE_UPDATE, "Cập nhật vai trò"),
-                new Permission(ROLE_DELETE, "Xóa vai trò"),
-                new Permission(ROLE_UPDATE_PERMISSIONS, "Gán quyền cho vai trò"),
-                new Permission(PERMISSION_VIEW, "Xem quyền"),
-                new Permission(PERMISSION_UPDATE, "Cập nhật quyền"),
-                new Permission(LOG_VIEW_ACTIVITY, "Xem user activity logs"),
-                new Permission(ADMIN_ACTIVITY_LOG_EXPORT, "Export user activity logs"),
-                new Permission(LOG_DELETE, "Xóa user activity logs"),
-                new Permission(USER_VIEW_OWN_LOGIN_HISTORY, "Xem lịch sử đăng nhập của bản thân")
-        );
-
-        permissionRepository.saveAll(permissions);
+                ensurePermission(USER_MANAGE, "Quản lý user (Admin)");
+                ensurePermission(USER_TOKEN_MANAGEMENT, "Quản lý token của user");
+                ensurePermission(TOKEN_INVALIDATE_OWN, "Hủy token của bản thân");
+                ensurePermission(TOKEN_INVALIDATE_USER, "Hủy token của user cụ thể");
+                ensurePermission(TOKEN_VIEW_OWN, "Xem token version của bản thân");
+                ensurePermission(TOKEN_VIEW_USER, "Xem token version của user cụ thể");
+                ensurePermission(ROLE_VIEW, "Xem vai trò");
+                ensurePermission(ROLE_CREATE, "Tạo vai trò");
+                ensurePermission(ROLE_UPDATE, "Cập nhật vai trò");
+                ensurePermission(ROLE_DELETE, "Xóa vai trò");
+                ensurePermission(ROLE_UPDATE_PERMISSIONS, "Gán quyền cho vai trò");
+                ensurePermission(PERMISSION_VIEW, "Xem quyền");
+                ensurePermission(PERMISSION_UPDATE, "Cập nhật quyền");
+                ensurePermission(LOG_VIEW_ACTIVITY, "Xem user activity logs");
+                ensurePermission(ADMIN_ACTIVITY_LOG_EXPORT, "Export user activity logs");
+                ensurePermission(LOG_DELETE, "Xóa user activity logs");
+                ensurePermission(USER_VIEW_OWN_LOGIN_HISTORY, "Xem lịch sử đăng nhập của bản thân");
 
         log.debug("✅ Created {} permissions", permissionRepository.count());
     }
+
+        private void ensurePermission(String code, String description) {
+                if (permissionRepository.findByCode(code).isPresent()) {
+                        return;
+                }
+                permissionRepository.save(new Permission(code, description));
+        }
 
     private void createRoles() {
         log.debug("👑 Creating system roles...");
@@ -104,24 +114,40 @@ public class PermissionRoleInitializer {
         // Admin: full quyền
         Set<Permission> adminPerms = new HashSet<>(permMap.values());
 
-        // Member: quyền giới hạn
-        Set<Permission> memberPerms = Set.of(
+        // Operational roles: quyền giới hạn cơ bản
+        Set<Permission> operationalPerms = Set.of(
                 permMap.get(USER_TOKEN_MANAGEMENT),
                 permMap.get(TOKEN_INVALIDATE_OWN),
                 permMap.get(TOKEN_VIEW_OWN),
                 permMap.get(USER_VIEW_OWN_LOGIN_HISTORY)
         );
 
-        roleRepository.save(Role.builder()
-                .name("ADMIN")
-                .permissions(adminPerms)
-                .build());
+        // Manager: có thêm quyền giám sát
+        Set<Permission> managerPerms = new HashSet<>(operationalPerms);
+        managerPerms.add(permMap.get(LOG_VIEW_ACTIVITY));
+        managerPerms.add(permMap.get(PERMISSION_VIEW));
 
-        roleRepository.save(Role.builder()
-                .name("MEMBER")
-                .permissions(memberPerms)
-                .build());
+        // Supply coordinator: nghiệp vụ điều phối + xem log
+        Set<Permission> supplyCoordinatorPerms = new HashSet<>(operationalPerms);
+        supplyCoordinatorPerms.add(permMap.get(LOG_VIEW_ACTIVITY));
+
+        ensureRole(ROLE_ADMIN, adminPerms);
+        ensureRole(ROLE_MANAGER, managerPerms);
+        ensureRole(ROLE_SUPPLY_COORDINATOR, supplyCoordinatorPerms);
+        ensureRole(ROLE_CENTRAL_KITCHEN_STAFF, operationalPerms);
+        ensureRole(ROLE_FRANCHISE_STORE_STAFF, operationalPerms);
+        ensureRole(ROLE_SHIPPER, operationalPerms);
 
         log.debug("✅ Created {} roles", roleRepository.count());
+    }
+
+    private void ensureRole(String roleName, Set<Permission> permissions) {
+        if (roleRepository.existsByName(roleName)) {
+            return;
+        }
+        roleRepository.save(Role.builder()
+                .name(roleName)
+                .permissions(permissions)
+                .build());
     }
 }

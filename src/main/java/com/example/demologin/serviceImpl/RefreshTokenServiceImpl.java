@@ -81,14 +81,14 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                 .orElseThrow(() -> new TokenRefreshException(requestRefreshToken, "Refresh token is not in database!"));
     }
 
-    @Scheduled(fixedRate = 3600000)
-    @Transactional
-    public void cleanExpiredTokens() {
-        LocalDateTime now = LocalDateTime.now();
-        int deletedCount = refreshTokenRepository.deleteByExpiryDateBefore(now);
-        if (deletedCount > 0) {
-            log.info("✅ Đã xóa {} refresh token hết hạn trước {}", deletedCount, now);
-        }
-    }
+//    @Scheduled(fixedRate = 3600000)
+//    @Transactional
+//    public void cleanExpiredTokens() {
+//        LocalDateTime now = LocalDateTime.now();
+//        int deletedCount = refreshTokenRepository.deleteByExpiryDateBefore(now);
+//        if (deletedCount > 0) {
+//            log.info("✅ Đã xóa {} refresh token hết hạn trước {}", deletedCount, now);
+//        }
+//    }
 
 } 

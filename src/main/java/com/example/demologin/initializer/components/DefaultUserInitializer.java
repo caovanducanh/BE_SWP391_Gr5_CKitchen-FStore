@@ -1,14 +1,11 @@
 package com.example.demologin.initializer.components;
 
-import java.time.LocalDate;
-
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demologin.entity.Role;
 import com.example.demologin.entity.User;
-import com.example.demologin.enums.Gender;
 import com.example.demologin.enums.UserStatus;
 import com.example.demologin.repository.RoleRepository;
 import com.example.demologin.repository.UserRepository;
@@ -66,17 +63,12 @@ public class DefaultUserInitializer {
                 username,
                 passwordEncoder.encode(rawPassword),
                 username + " Fullname",
-                username + "@example.com",
-                "0123456789",
-                "123 Main Street"
+            username + "@example.com"
         );
         
         // Set additional properties
         user.setRole(role);
-        user.setIdentityCard("123456789");
-        user.setDateOfBirth(LocalDate.of(1995, 1, 1));
         user.setStatus(UserStatus.ACTIVE);
-        user.setGender(Gender.OTHER);
         user.setTokenVersion(0);
         user.setVerify(true);
         user.setLocked(false);

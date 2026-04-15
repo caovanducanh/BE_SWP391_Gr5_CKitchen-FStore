@@ -1,6 +1,5 @@
 package com.example.demologin.serviceImpl;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -30,7 +29,6 @@ import com.example.demologin.entity.RefreshToken;
 import com.example.demologin.entity.User;
 import com.example.demologin.entity.UserActivityLog;
 import com.example.demologin.enums.ActivityType;
-import com.example.demologin.enums.Gender;
 import com.example.demologin.enums.UserStatus;
 import com.example.demologin.exception.exceptions.BadRequestException;
 import com.example.demologin.exception.exceptions.ConflictException;
@@ -111,15 +109,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     request.getUsername(),
                     passwordEncoder.encode(request.getPassword()),
                     request.getFullName(),
-                    request.getEmail(),
-                    request.getPhone(),
-                    request.getAddress()
+                    request.getEmail()
             );
             
             // Set fields
-            newUser.setDateOfBirth(request.getDateOfBirth());
-            newUser.setGender(request.getGender());
-            newUser.setIdentityCard(request.getIdentityCard());
             newUser.setRole(memberRole);
             newUser.setStatus(UserStatus.ACTIVE);
             
@@ -378,17 +371,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                         email.substring(0, email.indexOf('@')),
                         passwordEncoder.encode(""),
                         name != null ? name : (firstName + " " + lastName),
-                        email,
-                        "",
-                        location != null ? location : ""
+                    email
                 );
                 
                 user.setRole(memberRole);
                 user.setStatus(UserStatus.ACTIVE);
                 user.setCreatedAt(LocalDateTime.now());
-                user.setIdentityCard("");
-                user.setDateOfBirth(parseBirthday(birthday));
-                user.setGender(parseGender(gender));
                 user.setVerify(true);
                 
                 user = userRepository.save(user);
@@ -396,10 +384,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 boolean updated = false;
                 if (name != null && !name.equals(user.getFullName())) {
                     user.setFullName(name);
-                    updated = true;
-                }
-                if (location != null && !location.equals(user.getAddress())) {
-                    user.setAddress(location);
                     updated = true;
                 }
                 if (user.getRole() == null || !DEFAULT_ROLE.equals(user.getRole().getName())) {
@@ -423,37 +407,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         } catch (Exception e) {
             log.error("Error authenticating with Facebook OAuth2", e);
             throw new InternalServerErrorException("Facebook OAuth2 authentication failed: " + e.getMessage());
-        }
-    }
-
-    private LocalDate parseBirthday(String birthday) {
-        if (birthday == null || birthday.isEmpty()) {
-            return LocalDate.now().minusYears(18);
-        }
-        try {
-            if (birthday.contains("/")) {
-                String[] parts = birthday.split("/");
-                int month = Integer.parseInt(parts[0]);
-                int day = Integer.parseInt(parts[1]);
-                int year = Integer.parseInt(parts[2]);
-                return LocalDate.of(year, month, day);
-            } else if (birthday.contains("-")) {
-                return LocalDate.parse(birthday);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to parse birthday: {}", birthday, e);
-        }
-        return LocalDate.now().minusYears(18);
-    }
-
-    private Gender parseGender(String gender) {
-        if (gender == null || gender.isEmpty()) {
-            return Gender.OTHER;
-        }
-        switch (gender.toLowerCase()) {
-            case "male": return Gender.MALE;
-            case "female": return Gender.FEMALE;
-            default: return Gender.OTHER;
         }
     }
 

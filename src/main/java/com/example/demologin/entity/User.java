@@ -1,6 +1,5 @@
 package com.example.demologin.entity;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -12,7 +11,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import com.example.demologin.enums.Gender;
 import com.example.demologin.enums.UserStatus;
 
 import jakarta.persistence.Column;
@@ -46,24 +44,11 @@ public class User implements UserDetails {
     @JoinColumn(name = "role_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Role role;
 
-    @Column(nullable = false, length = 100)
+    @Column(name = "full_name", nullable = false, length = 100)
     private String fullName;
 
     @Column(nullable = false, length = 255)
     private String email;
-
-
-    @Column(nullable = false, length = 15)
-    private String phone;
-
-    @Column(nullable = false, length = 255)
-    private String address;
-
-    @Column(nullable = false, length = 255)
-    private String identityCard ;
-
-    @Column(nullable = false)
-    private LocalDate dateOfBirth;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
@@ -74,11 +59,6 @@ public class User implements UserDetails {
 
 
     private int tokenVersion;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
-    private Gender gender;
-
     @Column(name = "is_verify", nullable = false)
     private boolean isVerify = false;
 
@@ -89,13 +69,11 @@ public class User implements UserDetails {
     // Constructors
     public User() {}
 
-    public User(String username, String password, String fullName, String email, String phone, String address) {
+    public User(String username, String password, String fullName, String email) {
         this.username = username;
         this.password = password;
         this.fullName = fullName;
         this.email = email;
-        this.phone = phone;
-        this.address = address;
         this.locked = false;
     }
 
@@ -202,52 +180,12 @@ public class User implements UserDetails {
         this.fullName = fullName;
     }
     
-    public String getPhone() {
-        return phone;
-    }
-    
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
-    
-    public String getAddress() {
-        return address;
-    }
-    
-    public void setAddress(String address) {
-        this.address = address;
-    }
-    
-    public String getIdentityCard() {
-        return identityCard;
-    }
-    
-    public void setIdentityCard(String identityCard) {
-        this.identityCard = identityCard;
-    }
-    
-    public LocalDate getDateOfBirth() {
-        return dateOfBirth;
-    }
-    
-    public void setDateOfBirth(LocalDate dateOfBirth) {
-        this.dateOfBirth = dateOfBirth;
-    }
-    
     public UserStatus getStatus() {
         return status;
     }
     
     public void setStatus(UserStatus status) {
         this.status = status;
-    }
-    
-    public Gender getGender() {
-        return gender;
-    }
-    
-    public void setGender(Gender gender) {
-        this.gender = gender;
     }
     
     public LocalDateTime getCreatedAt() {

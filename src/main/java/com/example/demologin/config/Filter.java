@@ -61,11 +61,20 @@ public class Filter extends OncePerRequestFilter {
 
             User user = tokenService.getUserByToken(token);
             if (user == null) {
-                throw new UnauthorizedException("User not found for the provided token!");
+                throw new UnauthorizedException("USER_NOT_FOUND");
+            }
+
+            // Kiểm tra trạng thái tài khoản
+            if (user.isLocked()) {
+                throw new UnauthorizedException("ACCOUNT_LOCKED");
+            }
+
+            if (!user.isEnabled()) {
+                throw new UnauthorizedException("ACCOUNT_DISABLED");
             }
 
             if (!jwtUtil.validateTokenWithJtiCheck(token, user)) {
-                throw new InvalidTokenException("Authentication token is invalid or revoked!");
+                throw new InvalidTokenException("TOKEN_REVOKED_OR_INVALID");
             }
 
             UsernamePasswordAuthenticationToken authToken =

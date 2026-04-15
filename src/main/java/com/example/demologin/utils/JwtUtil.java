@@ -63,6 +63,10 @@ public class JwtUtil {
 
         Map<String, Object> claims = new HashMap<>();
         claims.put("tokenVersion", user.getTokenVersion());
+        
+        // Thêm status cho frontend dễ kiểm tra trạng thái token
+        String statusLabel = user.isLocked() ? "LOCKED" : (user.getStatus() != null ? user.getStatus().name() : "UNKNOWN");
+        claims.put("status", statusLabel);
 
         // Keep roles claim as a set for backward compatibility, but user now has exactly one role.
         Set<String> roleNames = user.getRole() == null

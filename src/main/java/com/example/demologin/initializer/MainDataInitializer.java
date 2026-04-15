@@ -1,7 +1,10 @@
 package com.example.demologin.initializer;
 
 import com.example.demologin.initializer.components.DefaultUserInitializer;
+import com.example.demologin.initializer.components.IngredientInitializer;
 import com.example.demologin.initializer.components.PermissionRoleInitializer;
+import com.example.demologin.initializer.components.ProductInitializer;
+import com.example.demologin.initializer.components.RecipeInitializer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -17,7 +20,9 @@ import org.springframework.stereotype.Component;
  * Execution Order:
  * 1. PermissionRoleInitializer - Creates permissions and roles
  * 2. DefaultUserInitializer - Creates default users with assigned roles
- * 3. Future initializers can be added here with proper ordering
+ * 3. IngredientInitializer - Creates raw materials
+ * 4. ProductInitializer - Creates products
+ * 5. RecipeInitializer - Creates relationships between products and ingredients
  */
 @Component
 @RequiredArgsConstructor
@@ -27,6 +32,9 @@ public class MainDataInitializer implements CommandLineRunner {
 
     private final PermissionRoleInitializer permissionRoleInitializer;
     private final DefaultUserInitializer defaultUserInitializer;
+    private final IngredientInitializer ingredientInitializer;
+    private final ProductInitializer productInitializer;
+    private final RecipeInitializer recipeInitializer;
 
     @Override
     public void run(String... args) throws Exception {
@@ -43,10 +51,20 @@ public class MainDataInitializer implements CommandLineRunner {
             defaultUserInitializer.initializeDefaultUsers();
             log.info("✅ Default Users initialization completed");
             
-            // Future initialization steps can be added here
-            // Example:
-            // log.info("📊 Step 3: Initializing System Settings...");
-            // systemSettingsInitializer.initializeSettings();
+            // Step 3: Initialize Ingredients
+            log.info("📦 Step 3: Initializing Ingredients...");
+            ingredientInitializer.initializeIngredients();
+            log.info("✅ Ingredients initialization completed");
+
+            // Step 4: Initialize Products
+            log.info("🍎 Step 4: Initializing Products...");
+            productInitializer.initializeProducts();
+            log.info("✅ Products initialization completed");
+
+            // Step 5: Initialize Recipes
+            log.info("📝 Step 5: Initializing Recipes...");
+            recipeInitializer.initializeRecipes();
+            log.info("✅ Recipes initialization completed");
             
             log.info("🎉 Main Data Initialization Process completed successfully!");
             

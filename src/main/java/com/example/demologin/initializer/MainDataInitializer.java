@@ -2,6 +2,7 @@ package com.example.demologin.initializer;
 
 import com.example.demologin.initializer.components.DefaultUserInitializer;
 import com.example.demologin.initializer.components.IngredientInitializer;
+import com.example.demologin.initializer.components.ManagerDashboardDataInitializer;
 import com.example.demologin.initializer.components.PermissionRoleInitializer;
 import com.example.demologin.initializer.components.ProductInitializer;
 import com.example.demologin.initializer.components.RecipeInitializer;
@@ -35,6 +36,7 @@ public class MainDataInitializer implements CommandLineRunner {
     private final IngredientInitializer ingredientInitializer;
     private final ProductInitializer productInitializer;
     private final RecipeInitializer recipeInitializer;
+    private final ManagerDashboardDataInitializer managerDashboardDataInitializer;
 
     @Override
     public void run(String... args) throws Exception {
@@ -65,6 +67,11 @@ public class MainDataInitializer implements CommandLineRunner {
             log.info("📝 Step 5: Initializing Recipes...");
             recipeInitializer.initializeRecipes();
             log.info("✅ Recipes initialization completed");
+
+            // Step 6: Initialize Manager Dashboard Data
+            log.info("📊 Step 6: Initializing Manager Dashboard Data...");
+            managerDashboardDataInitializer.initializeManagerDashboardData();
+            log.info("✅ Manager Dashboard Data initialization completed");
             
             log.info("🎉 Main Data Initialization Process completed successfully!");
             

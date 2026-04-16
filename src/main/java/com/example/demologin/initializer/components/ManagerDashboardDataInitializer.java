@@ -17,6 +17,7 @@ import com.example.demologin.repository.IngredientRepository;
 import com.example.demologin.repository.InventoryDisposalRepository;
 import com.example.demologin.repository.KitchenInventoryRepository;
 import com.example.demologin.repository.KitchenRepository;
+import com.example.demologin.repository.OrderItemRepository;
 import com.example.demologin.repository.OrderRepository;
 import com.example.demologin.repository.ProductRepository;
 import com.example.demologin.repository.ProductionPlanRepository;
@@ -44,6 +45,7 @@ public class ManagerDashboardDataInitializer {
     private final ProductionPlanRepository productionPlanRepository;
     private final BatchRepository batchRepository;
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final KitchenInventoryRepository kitchenInventoryRepository;
     private final StoreInventoryRepository storeInventoryRepository;
     private final SalesRecordRepository salesRecordRepository;
@@ -80,21 +82,49 @@ public class ManagerDashboardDataInitializer {
                 "kitchen", "Afternoon production wave"
         );
 
+        // ===== ORDERS =====
         Order order1 = ensureOrder(
                 "ORD001", store, kitchen, "PENDING", "HIGH",
                 LocalDateTime.now().minusHours(4), LocalDate.now().plusDays(1),
-                "Need urgent refill", "manager", new BigDecimal("650000")
+                "Cần bổ sung gấp ngượi liệu", "storestaff", new BigDecimal("650000")
         );
-        ensureOrder(
+        Order order2 = ensureOrder(
                 "ORD002", store, kitchen, "PROCESSING", "NORMAL",
-                LocalDateTime.now().minusHours(2), LocalDate.now().plusDays(2),
-                "Weekly restock", "manager", new BigDecimal("430000")
+                LocalDateTime.now().minusHours(8), LocalDate.now().plusDays(2),
+                "Nhập hàng tuần", "storestaff", new BigDecimal("430000")
         );
-        ensureOrder(
+        Order order3 = ensureOrder(
                 "ORD003", store, kitchen, "APPROVED", "NORMAL",
-                LocalDateTime.now().minusHours(1), LocalDate.now().plusDays(3),
-                "Store event restock", "manager", new BigDecimal("520000")
+                LocalDateTime.now().minusDays(1), LocalDate.now().plusDays(3),
+                "Sự kiện cuối tuần", "storestaff", new BigDecimal("520000")
         );
+        Order order4 = ensureOrder(
+                "ORD004", store, kitchen, "SHIPPING", "HIGH",
+                LocalDateTime.now().minusDays(2), LocalDate.now(),
+                "Giao hôm nay", "storestaff", new BigDecimal("310000")
+        );
+        Order order5 = ensureOrder(
+                "ORD005", store, kitchen, "DELIVERED", "NORMAL",
+                LocalDateTime.now().minusDays(3), LocalDate.now().minusDays(1),
+                "Đã nhận 28/03", "storestaff", new BigDecimal("290000")
+        );
+        Order order6 = ensureOrder(
+                "ORD006", store, kitchen, "CANCELLED", "LOW",
+                LocalDateTime.now().minusDays(4), LocalDate.now().minusDays(2),
+                "Hủy do hết sản phẩm", "storestaff", new BigDecimal("0")
+        );
+
+        // ===== ORDER ITEMS =====
+        ensureOrderItem(order1, product1, 50, "piece");
+        ensureOrderItem(order1, product2, 30, "piece");
+        ensureOrderItem(order2, product1, 40, "piece");
+        ensureOrderItem(order2, product2, 20, "piece");
+        ensureOrderItem(order3, product1, 60, "piece");
+        ensureOrderItem(order3, product2, 25, "piece");
+        ensureOrderItem(order4, product2, 35, "piece");
+        ensureOrderItem(order5, product1, 30, "piece");
+        ensureOrderItem(order5, product2, 15, "piece");
+        ensureOrderItem(order6, product1, 10, "piece");
 
         ensureBatch(
                 "BATCH001", order1, 1, plan1, product1, kitchen,
@@ -215,6 +245,21 @@ public class ManagerDashboardDataInitializer {
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build()));
+    }
+
+    private void ensureOrderItem(Order order, Product product, int quantity, String unit) {
+        boolean exists = orderItemRepository.findByOrder_Id(order.getId())
+                .stream().anyMatch(i -> i.getProduct().getId().equals(product.getId()));
+        if (exists) return;
+        orderItemRepository.save(
+                com.example.demologin.entity.OrderItem.builder()
+                        .order(order)
+                        .product(product)
+                        .quantity(quantity)
+                        .unit(unit)
+                        .createdAt(LocalDateTime.now())
+                        .build()
+        );
     }
 
     private void ensureKitchenInventories(Ingredient ingredient1, Ingredient ingredient2) {

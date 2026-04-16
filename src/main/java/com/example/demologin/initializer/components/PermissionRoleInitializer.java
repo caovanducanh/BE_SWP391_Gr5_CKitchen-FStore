@@ -58,6 +58,13 @@ public class PermissionRoleInitializer {
     private static final String INVENTORY_VIEW = "INVENTORY_VIEW";
     private static final String MANAGER_DASHBOARD_VIEW = "MANAGER_DASHBOARD_VIEW";
 
+    // Franchise Store Staff permissions
+    private static final String ORDER_VIEW = "ORDER_VIEW";
+    private static final String ORDER_CREATE = "ORDER_CREATE";
+    private static final String DELIVERY_VIEW = "DELIVERY_VIEW";
+    private static final String DELIVERY_CONFIRM = "DELIVERY_CONFIRM";
+    private static final String STORE_INVENTORY_VIEW = "STORE_INVENTORY_VIEW";
+
         // ===================== ROLE NAMES =====================
         private static final String ROLE_ADMIN = "ADMIN";
         private static final String ROLE_MANAGER = "MANAGER";
@@ -101,6 +108,11 @@ public class PermissionRoleInitializer {
                 ensurePermission(RECIPE_MANAGE, "Quản lý công thức và định mức nguyên liệu");
                 ensurePermission(INVENTORY_VIEW, "Xem tồn kho bếp trung tâm và cửa hàng");
                 ensurePermission(MANAGER_DASHBOARD_VIEW, "Xem dashboard vận hành manager");
+                ensurePermission(ORDER_VIEW, "Xem đơn đặt hàng");
+                ensurePermission(ORDER_CREATE, "Tạo đơn đặt hàng nguyên liệu từ bếp trung tâm");
+                ensurePermission(DELIVERY_VIEW, "Xem trạng thái giao hàng");
+                ensurePermission(DELIVERY_CONFIRM, "Xác nhận nhận hàng và phản hồi chất lượng");
+                ensurePermission(STORE_INVENTORY_VIEW, "Xem tồn kho cửa hàng franchise");
 
         log.debug("✅ Created {} permissions", permissionRepository.count());
     }
@@ -148,7 +160,16 @@ public class PermissionRoleInitializer {
         ensureRole(ROLE_MANAGER, managerPerms);
         ensureRole(ROLE_SUPPLY_COORDINATOR, supplyCoordinatorPerms);
         ensureRole(ROLE_CENTRAL_KITCHEN_STAFF, operationalPerms);
-        ensureRole(ROLE_FRANCHISE_STORE_STAFF, operationalPerms);
+
+        // Franchise Store Staff: thêm quyền nghiệp vụ đặt hàng và tồn kho
+        Set<Permission> franchiseStorePerms = new HashSet<>(operationalPerms);
+        franchiseStorePerms.add(permMap.get(ORDER_VIEW));
+        franchiseStorePerms.add(permMap.get(ORDER_CREATE));
+        franchiseStorePerms.add(permMap.get(DELIVERY_VIEW));
+        franchiseStorePerms.add(permMap.get(DELIVERY_CONFIRM));
+        franchiseStorePerms.add(permMap.get(STORE_INVENTORY_VIEW));
+        ensureRole(ROLE_FRANCHISE_STORE_STAFF, franchiseStorePerms);
+
         ensureRole(ROLE_SHIPPER, operationalPerms);
 
         log.debug("✅ Created {} roles", roleRepository.count());

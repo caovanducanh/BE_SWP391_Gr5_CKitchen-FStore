@@ -1,0 +1,105 @@
+package com.example.demologin.controller;
+
+import com.example.demologin.dto.request.store.ConfirmReceiptRequest;
+import com.example.demologin.dto.request.store.CreateOrderRequest;
+import com.example.demologin.dto.response.DeliveryResponse;
+import com.example.demologin.dto.response.OrderResponse;
+import com.example.demologin.dto.response.StoreInventoryResponse;
+import com.example.demologin.service.FranchiseStoreService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+
+import java.security.Principal;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.Mockito.*;
+
+class FranchiseStoreControllerTest {
+
+    @Mock
+    private FranchiseStoreService franchiseStoreService;
+
+    @InjectMocks
+    private FranchiseStoreController controller;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+    }
+
+    @Test
+    void createOrder_shouldInvokeService() {
+        CreateOrderRequest request = mock(CreateOrderRequest.class);
+        Principal principal = mock(Principal.class);
+        OrderResponse response = OrderResponse.builder().id("ORD001").build();
+
+        when(franchiseStoreService.createOrder(request, principal)).thenReturn(response);
+
+        Object result = controller.createOrder(request, principal);
+
+        assertSame(response, result);
+        verify(franchiseStoreService).createOrder(request, principal);
+    }
+
+    @Test
+    void getOrders_shouldInvokeService() {
+        Page<OrderResponse> page = new PageImpl<>(List.of());
+        when(franchiseStoreService.getOrders("ST001", "PENDING", 0, 20)).thenReturn(page);
+
+        Object result = controller.getOrders("ST001", "PENDING", 0, 20);
+
+        assertSame(page, result);
+        verify(franchiseStoreService).getOrders("ST001", "PENDING", 0, 20);
+    }
+
+    @Test
+    void getOrderById_shouldInvokeService() {
+        OrderResponse response = OrderResponse.builder().id("ORD001").build();
+        when(franchiseStoreService.getOrderById("ORD001")).thenReturn(response);
+
+        Object result = controller.getOrderById("ORD001");
+
+        assertSame(response, result);
+        verify(franchiseStoreService).getOrderById("ORD001");
+    }
+
+    @Test
+    void getDeliveryByOrderId_shouldInvokeService() {
+        DeliveryResponse response = DeliveryResponse.builder().id("DEL001").build();
+        when(franchiseStoreService.getDeliveryByOrderId("ORD001")).thenReturn(response);
+
+        Object result = controller.getDeliveryByOrderId("ORD001");
+
+        assertSame(response, result);
+        verify(franchiseStoreService).getDeliveryByOrderId("ORD001");
+    }
+
+    @Test
+    void confirmReceipt_shouldInvokeService() {
+        ConfirmReceiptRequest request = mock(ConfirmReceiptRequest.class);
+        DeliveryResponse response = DeliveryResponse.builder().id("DEL001").build();
+        when(franchiseStoreService.confirmReceipt("DEL001", request)).thenReturn(response);
+
+        Object result = controller.confirmReceipt("DEL001", request);
+
+        assertSame(response, result);
+        verify(franchiseStoreService).confirmReceipt("DEL001", request);
+    }
+
+    @Test
+    void getStoreInventory_shouldInvokeService() {
+        Page<StoreInventoryResponse> page = new PageImpl<>(List.of());
+        when(franchiseStoreService.getStoreInventory("ST001", 0, 20)).thenReturn(page);
+
+        Object result = controller.getStoreInventory("ST001", 0, 20);
+
+        assertSame(page, result);
+        verify(franchiseStoreService).getStoreInventory("ST001", 0, 20);
+    }
+}

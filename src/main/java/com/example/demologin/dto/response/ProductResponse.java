@@ -1,5 +1,6 @@
 package com.example.demologin.dto.response;
 
+import com.example.demologin.enums.ProductCategory;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -12,7 +13,7 @@ import java.util.List;
 public class ProductResponse {
     private String id;
     private String name;
-    private String category;
+    private ProductCategory category;
     private String unit;
     private BigDecimal price;
     private BigDecimal cost;

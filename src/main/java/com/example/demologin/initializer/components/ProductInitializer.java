@@ -1,6 +1,7 @@
 package com.example.demologin.initializer.components;
 
 import com.example.demologin.entity.Product;
+import com.example.demologin.enums.ProductCategory;
 import com.example.demologin.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +32,7 @@ public class ProductInitializer {
                 Product.builder()
                         .id("PROD001")
                         .name("Bánh Mì Sừng Bò")
-                        .category("Bakery")
+                        .category(ProductCategory.BAKERY)
                         .unit("cái")
                         .price(new BigDecimal("25000"))
                         .cost(new BigDecimal("12000"))
@@ -40,7 +41,7 @@ public class ProductInitializer {
                 Product.builder()
                         .id("PROD002")
                         .name("Bánh Mì Gối")
-                        .category("Bakery")
+                        .category(ProductCategory.BAKERY)
                         .unit("ổ")
                         .price(new BigDecimal("15000"))
                         .cost(new BigDecimal("7000"))
@@ -49,7 +50,7 @@ public class ProductInitializer {
                 Product.builder()
                         .id("PROD003")
                         .name("Bánh Quy Bơ")
-                        .category("Bakery")
+                        .category(ProductCategory.BAKERY)
                         .unit("hộp")
                         .price(new BigDecimal("45000"))
                         .cost(new BigDecimal("20000"))
@@ -58,7 +59,7 @@ public class ProductInitializer {
                 Product.builder()
                         .id("PROD004")
                         .name("Bánh Kem Dâu")
-                        .category("Bakery")
+                        .category(ProductCategory.BAKERY)
                         .unit("ổ")
                         .price(new BigDecimal("200000"))
                         .cost(new BigDecimal("90000"))

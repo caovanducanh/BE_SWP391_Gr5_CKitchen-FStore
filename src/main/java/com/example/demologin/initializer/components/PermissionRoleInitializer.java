@@ -54,6 +54,9 @@ public class PermissionRoleInitializer {
 
     private static final String USER_VIEW_OWN_LOGIN_HISTORY = "USER_VIEW_OWN_LOGIN_HISTORY";
     private static final String PRODUCT_MANAGE = "PRODUCT_MANAGE";
+    private static final String RECIPE_MANAGE = "RECIPE_MANAGE";
+    private static final String INVENTORY_VIEW = "INVENTORY_VIEW";
+    private static final String MANAGER_DASHBOARD_VIEW = "MANAGER_DASHBOARD_VIEW";
 
         // ===================== ROLE NAMES =====================
         private static final String ROLE_ADMIN = "ADMIN";
@@ -95,6 +98,9 @@ public class PermissionRoleInitializer {
                 ensurePermission(LOG_DELETE, "Xóa user activity logs");
                 ensurePermission(USER_VIEW_OWN_LOGIN_HISTORY, "Xem lịch sử đăng nhập của bản thân");
                 ensurePermission(PRODUCT_MANAGE, "Quản lý sản phẩm");
+                ensurePermission(RECIPE_MANAGE, "Quản lý công thức và định mức nguyên liệu");
+                ensurePermission(INVENTORY_VIEW, "Xem tồn kho bếp trung tâm và cửa hàng");
+                ensurePermission(MANAGER_DASHBOARD_VIEW, "Xem dashboard vận hành manager");
 
         log.debug("✅ Created {} permissions", permissionRepository.count());
     }
@@ -130,6 +136,9 @@ public class PermissionRoleInitializer {
         managerPerms.add(permMap.get(LOG_VIEW_ACTIVITY));
         managerPerms.add(permMap.get(PERMISSION_VIEW));
         managerPerms.add(permMap.get(PRODUCT_MANAGE));
+        managerPerms.add(permMap.get(RECIPE_MANAGE));
+        managerPerms.add(permMap.get(INVENTORY_VIEW));
+        managerPerms.add(permMap.get(MANAGER_DASHBOARD_VIEW));
 
         // Supply coordinator: nghiệp vụ điều phối + xem log
         Set<Permission> supplyCoordinatorPerms = new HashSet<>(operationalPerms);

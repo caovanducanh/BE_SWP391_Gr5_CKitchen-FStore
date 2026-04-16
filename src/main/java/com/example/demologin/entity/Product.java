@@ -1,5 +1,7 @@
 package com.example.demologin.entity;
 
+import com.example.demologin.enums.ProductCategory;
+import com.example.demologin.utils.ProductCategoryConverter;
 import com.example.demologin.utils.StringListConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -33,8 +35,9 @@ public class Product {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(nullable = false, length = 50)
-    private String category;
+    @Convert(converter = ProductCategoryConverter.class)
+    @Column(nullable = false, length = 30)
+    private ProductCategory category;
 
     @Column(nullable = false, length = 20)
     private String unit;

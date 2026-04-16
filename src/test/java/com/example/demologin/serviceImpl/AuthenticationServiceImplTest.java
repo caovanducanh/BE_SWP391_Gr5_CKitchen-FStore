@@ -98,8 +98,8 @@ class AuthenticationServiceImplTest {
 		req.setAddress("abc abc abc");
 		when(userRepository.existsByUsername("user")).thenReturn(false);
 		when(userRepository.existsByEmail("a@a.com")).thenReturn(false);
-		when(roleRepository.findByName("MEMBER")).thenReturn(java.util.Optional.empty());
-	assertThrows(InternalServerErrorException.class, () -> authenticationService.register(req));
+		when(roleRepository.findByName("SHIPPER")).thenReturn(java.util.Optional.empty());
+		assertThrows(InternalServerErrorException.class, () -> authenticationService.register(req));
 	}
 
 	@Test
@@ -118,8 +118,8 @@ class AuthenticationServiceImplTest {
 		when(userRepository.existsByUsername("user")).thenReturn(false);
 		when(userRepository.existsByEmail("a@a.com")).thenReturn(false);
 		Role role = new Role();
-		role.setName("MEMBER");
-		when(roleRepository.findByName("MEMBER")).thenReturn(java.util.Optional.of(role));
+		role.setName("SHIPPER");
+		when(roleRepository.findByName("SHIPPER")).thenReturn(java.util.Optional.of(role));
 		when(passwordEncoder.encode("123")).thenReturn("encoded");
 		when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 		assertDoesNotThrow(() -> authenticationService.register(req));
@@ -141,8 +141,8 @@ class AuthenticationServiceImplTest {
 		when(userRepository.existsByUsername("user")).thenReturn(false);
 		when(userRepository.existsByEmail("a@a.com")).thenReturn(false);
 		Role role = new Role();
-		role.setName("MEMBER");
-		when(roleRepository.findByName("MEMBER")).thenReturn(java.util.Optional.of(role));
+		role.setName("SHIPPER");
+		when(roleRepository.findByName("SHIPPER")).thenReturn(java.util.Optional.of(role));
 		when(passwordEncoder.encode("123")).thenReturn("encoded");
 		when(userRepository.save(any(User.class))).thenThrow(new RuntimeException("fail"));
 		assertThrows(InternalServerErrorException.class, () -> authenticationService.register(req));

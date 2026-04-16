@@ -4,9 +4,11 @@ import com.example.demologin.dto.request.product.CreateProductRequest;
 import com.example.demologin.dto.request.product.UpdateProductRequest;
 import com.example.demologin.dto.response.ProductResponse;
 import com.example.demologin.entity.Product;
+import com.example.demologin.enums.ProductCategory;
 import com.example.demologin.exception.exceptions.BadRequestException;
 import com.example.demologin.exception.exceptions.InternalServerErrorException;
 import com.example.demologin.exception.exceptions.NotFoundException;
+import com.example.demologin.mapper.ProductMapper;
 import com.example.demologin.repository.ProductRepository;
 import com.example.demologin.service.ProductService;
 import io.minio.BucketExistsArgs;
@@ -38,6 +40,7 @@ public class ProductServiceImpl implements ProductService {
     private static final String PRODUCT_ID_PREFIX = "PROD";
 
     private final ProductRepository productRepository;
+    private final ProductMapper productMapper;
 
     @Value("${minio.endpoint}")
     private String minioEndpoint;
@@ -55,14 +58,22 @@ public class ProductServiceImpl implements ProductService {
     private String minioPublicUrl;
 
     @Override
-    public Page<ProductResponse> getAllProducts(int page, int size) {
-        return productRepository.findAll(PageRequest.of(page, size)).map(this::toResponse);
+    public Page<ProductResponse> getAllProducts(int page, int size, String search, String category) {
+        String normalizedSearch = normalizeSearch(search);
+        ProductCategory parsedCategory = parseCategory(category);
+        return productRepository.searchProducts(normalizedSearch, parsedCategory, PageRequest.of(page, size))
+                .map(productMapper::toResponse);
+    }
+
+    @Override
+    public List<ProductCategory> getAllCategories() {
+        return List.of(ProductCategory.values());
     }
 
     @Override
     public ProductResponse getProductById(String id) {
         Product product = findProductById(id);
-        return toResponse(product);
+        return productMapper.toResponse(product);
     }
 
     @Override
@@ -72,7 +83,7 @@ public class ProductServiceImpl implements ProductService {
         Product product = Product.builder()
                 .id(generateProductId())
                 .name(request.getName().trim())
-                .category(request.getCategory().trim())
+            .category(parseCategory(request.getCategory()))
                 .unit(request.getUnit().trim())
                 .price(request.getPrice())
                 .cost(request.getCost())
@@ -84,7 +95,7 @@ public class ProductServiceImpl implements ProductService {
         product.setImageUrl(uploadedImageUrls);
 
         Product savedProduct = productRepository.save(product);
-        return toResponse(savedProduct);
+        return productMapper.toResponse(savedProduct);
     }
 
     @Override
@@ -93,7 +104,7 @@ public class ProductServiceImpl implements ProductService {
 
         Product product = findProductById(id);
         product.setName(request.getName().trim());
-        product.setCategory(request.getCategory().trim());
+        product.setCategory(parseCategory(request.getCategory()));
         product.setUnit(request.getUnit().trim());
         product.setPrice(request.getPrice());
         product.setCost(request.getCost());
@@ -105,7 +116,7 @@ public class ProductServiceImpl implements ProductService {
         }
 
         Product updatedProduct = productRepository.save(product);
-        return toResponse(updatedProduct);
+        return productMapper.toResponse(updatedProduct);
     }
 
     @Override
@@ -123,7 +134,7 @@ public class ProductServiceImpl implements ProductService {
         product.setUpdatedAt(LocalDateTime.now());
 
         Product updatedProduct = productRepository.save(product);
-        return toResponse(updatedProduct);
+        return productMapper.toResponse(updatedProduct);
     }
 
     @Override
@@ -162,7 +173,7 @@ public class ProductServiceImpl implements ProductService {
         product.setImageUrl(currentImageUrls);
         product.setUpdatedAt(LocalDateTime.now());
         Product updatedProduct = productRepository.save(product);
-        return toResponse(updatedProduct);
+        return productMapper.toResponse(updatedProduct);
     }
 
     @Override
@@ -178,7 +189,7 @@ public class ProductServiceImpl implements ProductService {
         product.setUpdatedAt(LocalDateTime.now());
 
         Product updatedProduct = productRepository.save(product);
-        return toResponse(updatedProduct);
+        return productMapper.toResponse(updatedProduct);
     }
 
     @Override
@@ -302,18 +313,24 @@ public class ProductServiceImpl implements ProductService {
         return originalFilename.substring(originalFilename.lastIndexOf('.'));
     }
 
-    private ProductResponse toResponse(Product product) {
-        return ProductResponse.builder()
-                .id(product.getId())
-                .name(product.getName())
-                .category(product.getCategory())
-                .unit(product.getUnit())
-                .price(product.getPrice())
-                .cost(product.getCost())
-                .imageUrl(product.getImageUrl() == null ? new ArrayList<>() : product.getImageUrl())
-                .createdAt(product.getCreatedAt())
-                .updatedAt(product.getUpdatedAt())
-                .build();
+    private String normalizeSearch(String search) {
+        if (search == null) {
+            return null;
+        }
+        String normalized = search.trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private ProductCategory parseCategory(String category) {
+        if (category == null || category.isBlank()) {
+            return null;
+        }
+
+        try {
+            return ProductCategory.valueOf(category.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Invalid product category: " + category);
+        }
     }
 
     private String buildPublicImageUrl(String objectName) {

@@ -7,14 +7,14 @@ import com.example.demologin.dto.request.product.CreateProductRequest;
 import com.example.demologin.dto.request.product.UpdateProductRequest;
 import com.example.demologin.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -28,12 +28,39 @@ public class ProductController {
     @PageResponse
     @ApiResponse(message = "Products retrieved successfully")
     @SecuredEndpoint("PRODUCT_MANAGE")
-    @Operation(summary = "Get products", description = "Get paginated product list")
+        @Operation(
+            summary = "Get products",
+            description = "Get paginated product list. Search currently matches product name (contains, case-insensitive)."
+        )
     public Object getAllProducts(
+            @Parameter(description = "Page index (0-based)", example = "0")
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @Parameter(description = "Page size", example = "20")
+            @RequestParam(defaultValue = "20") int size,
+            @Parameter(
+                description = "Search keyword. Current behavior: filter by product name only (contains, case-insensitive)",
+                example = "bread"
+            )
+            @RequestParam(required = false) String search,
+            @Parameter(
+                description = "Filter by product category enum",
+                schema = @Schema(allowableValues = {"BAKERY", "BEVERAGE", "SNACK", "FROZEN", "OTHER"}),
+                example = "BAKERY"
+            )
+            @RequestParam(required = false) String category
     ) {
-        return productService.getAllProducts(page, size);
+        return productService.getAllProducts(page, size, search, category);
+    }
+
+    @GetMapping("/categories")
+    @ApiResponse(message = "Product categories retrieved successfully")
+    @SecuredEndpoint("PRODUCT_MANAGE")
+        @Operation(
+            summary = "Get product categories",
+            description = "Get all available product category enum values for testing filters: BAKERY, BEVERAGE, SNACK, FROZEN, OTHER"
+        )
+    public Object getAllCategories() {
+        return productService.getAllCategories();
     }
 
     @GetMapping("/{id}")
@@ -64,7 +91,7 @@ public class ProductController {
     @ApiResponse(message = "Product images uploaded successfully")
     @SecuredEndpoint("PRODUCT_MANAGE")
     @Operation(summary = "Upload product images", description = "Upload multiple product images to MinIO and append to imageUrl list")
-    public Object uploadProductImages(@PathVariable String id, @RequestParam("images") MultipartFile[] images) {
+    public Object uploadProductImages(@PathVariable String id, @RequestPart("images") MultipartFile[] images) {
         return productService.uploadProductImages(id, images);
     }
 
@@ -72,7 +99,7 @@ public class ProductController {
     @ApiResponse(message = "Product image uploaded successfully")
     @SecuredEndpoint("PRODUCT_MANAGE")
     @Operation(summary = "Upload single product image", description = "Backward-compatible endpoint that appends one image to imageUrl list")
-    public Object uploadProductImage(@PathVariable String id, @RequestParam("image") MultipartFile image) {
+    public Object uploadProductImage(@PathVariable String id, @RequestPart("image") MultipartFile image) {
         return productService.uploadProductImages(id, new MultipartFile[]{image});
     }
 

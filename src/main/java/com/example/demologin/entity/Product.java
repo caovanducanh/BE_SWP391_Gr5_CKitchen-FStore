@@ -1,6 +1,8 @@
 package com.example.demologin.entity;
 
+import com.example.demologin.utils.StringListConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -12,6 +14,8 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "products")
@@ -41,8 +45,10 @@ public class Product {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal cost;
 
-    @Column(length = 255)
-    private String image;
+    @Convert(converter = StringListConverter.class)
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    @Builder.Default
+    private List<String> imageUrl = new ArrayList<>();
 
     private LocalDateTime createdAt;
 

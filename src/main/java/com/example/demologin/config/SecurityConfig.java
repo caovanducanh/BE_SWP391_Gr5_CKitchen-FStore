@@ -5,10 +5,8 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
-import io.swagger.v3.oas.models.servers.Server;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
@@ -28,10 +26,6 @@ import java.util.List;
 
 @Configuration
 public class SecurityConfig {
-
-    @Value("${BACKEND_BASE_URL:https://swp391-ckitchen.up.railway.app}")
-    private String backendBaseUrl;
-
 
     private final AuthenticationService authenticationService;
 
@@ -105,7 +99,6 @@ public class SecurityConfig {
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
-            .servers(List.of(new Server().url(backendBaseUrl)))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                 .components(new Components()
                         .addSecuritySchemes("bearerAuth",

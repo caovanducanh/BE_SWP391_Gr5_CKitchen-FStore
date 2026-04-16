@@ -35,7 +35,6 @@ public class ProductInitializer {
                         .unit("cái")
                         .price(new BigDecimal("25000"))
                         .cost(new BigDecimal("12000"))
-                        .image("croissant.jpg")
                         .createdAt(LocalDateTime.now())
                         .build(),
                 Product.builder()
@@ -45,7 +44,6 @@ public class ProductInitializer {
                         .unit("ổ")
                         .price(new BigDecimal("15000"))
                         .cost(new BigDecimal("7000"))
-                        .image("bread.jpg")
                         .createdAt(LocalDateTime.now())
                         .build(),
                 Product.builder()
@@ -55,7 +53,6 @@ public class ProductInitializer {
                         .unit("hộp")
                         .price(new BigDecimal("45000"))
                         .cost(new BigDecimal("20000"))
-                        .image("cookies.jpg")
                         .createdAt(LocalDateTime.now())
                         .build(),
                 Product.builder()
@@ -65,7 +62,6 @@ public class ProductInitializer {
                         .unit("ổ")
                         .price(new BigDecimal("200000"))
                         .cost(new BigDecimal("90000"))
-                        .image("strawberry_cake.jpg")
                         .createdAt(LocalDateTime.now())
                         .build()
         );

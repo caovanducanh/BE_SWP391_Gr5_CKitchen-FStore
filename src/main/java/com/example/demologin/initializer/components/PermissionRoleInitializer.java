@@ -2,6 +2,7 @@ package com.example.demologin.initializer.components;
 
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -52,6 +53,7 @@ public class PermissionRoleInitializer {
     private static final String LOG_DELETE = "LOG_DELETE";
 
     private static final String USER_VIEW_OWN_LOGIN_HISTORY = "USER_VIEW_OWN_LOGIN_HISTORY";
+    private static final String PRODUCT_MANAGE = "PRODUCT_MANAGE";
 
         // ===================== ROLE NAMES =====================
         private static final String ROLE_ADMIN = "ADMIN";
@@ -92,6 +94,7 @@ public class PermissionRoleInitializer {
                 ensurePermission(ADMIN_ACTIVITY_LOG_EXPORT, "Export user activity logs");
                 ensurePermission(LOG_DELETE, "Xóa user activity logs");
                 ensurePermission(USER_VIEW_OWN_LOGIN_HISTORY, "Xem lịch sử đăng nhập của bản thân");
+                ensurePermission(PRODUCT_MANAGE, "Quản lý sản phẩm");
 
         log.debug("✅ Created {} permissions", permissionRepository.count());
     }
@@ -126,6 +129,7 @@ public class PermissionRoleInitializer {
         Set<Permission> managerPerms = new HashSet<>(operationalPerms);
         managerPerms.add(permMap.get(LOG_VIEW_ACTIVITY));
         managerPerms.add(permMap.get(PERMISSION_VIEW));
+        managerPerms.add(permMap.get(PRODUCT_MANAGE));
 
         // Supply coordinator: nghiệp vụ điều phối + xem log
         Set<Permission> supplyCoordinatorPerms = new HashSet<>(operationalPerms);
@@ -142,12 +146,28 @@ public class PermissionRoleInitializer {
     }
 
     private void ensureRole(String roleName, Set<Permission> permissions) {
-        if (roleRepository.existsByName(roleName)) {
+        Set<Permission> validPermissions = permissions.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        var existingRole = roleRepository.findByName(roleName);
+        if (existingRole.isPresent()) {
+            Role role = existingRole.get();
+            Set<Permission> currentPermissions = role.getPermissions() == null
+                    ? new HashSet<>()
+                    : new HashSet<>(role.getPermissions());
+
+            boolean changed = currentPermissions.addAll(validPermissions);
+            if (changed) {
+                role.setPermissions(currentPermissions);
+                roleRepository.save(role);
+            }
             return;
         }
+
         roleRepository.save(Role.builder()
                 .name(roleName)
-                .permissions(permissions)
+                .permissions(validPermissions)
                 .build());
     }
 }

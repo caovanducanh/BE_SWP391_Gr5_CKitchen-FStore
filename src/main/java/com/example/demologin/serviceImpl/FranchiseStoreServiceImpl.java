@@ -4,6 +4,7 @@ import com.example.demologin.dto.request.store.ConfirmReceiptRequest;
 import com.example.demologin.dto.request.store.CreateOrderRequest;
 import com.example.demologin.dto.request.store.OrderItemRequest;
 import com.example.demologin.dto.response.DeliveryResponse;
+import com.example.demologin.dto.response.ProductResponse;
 import com.example.demologin.dto.response.OrderItemResponse;
 import com.example.demologin.dto.response.OrderResponse;
 import com.example.demologin.dto.response.StoreInventoryResponse;
@@ -17,7 +18,10 @@ import com.example.demologin.entity.Store;
 import com.example.demologin.entity.StoreInventory;
 import com.example.demologin.dto.response.StoreResponse;
 import com.example.demologin.entity.User;
+import com.example.demologin.enums.ProductCategory;
 import com.example.demologin.exception.exceptions.NotFoundException;
+import com.example.demologin.exception.exceptions.BadRequestException;
+import com.example.demologin.mapper.ProductMapper;
 import com.example.demologin.repository.DeliveryRepository;
 import com.example.demologin.repository.KitchenRepository;
 import com.example.demologin.repository.OrderItemRepository;
@@ -60,6 +64,7 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
     private final ProductRepository productRepository;
     private final OrderPriorityConfigRepository orderPriorityConfigRepository;
     private final UserRepository userRepository;
+    private final ProductMapper productMapper;
 
     @Override
     @Transactional
@@ -207,6 +212,25 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
             throw new NotFoundException("Current user is not associated with any store");
         }
         return toStoreResponse(store);
+    }
+
+    @Override
+    public Page<ProductResponse> getAvailableProducts(String name, String category, int page, int size) {
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by("name"));
+        
+        ProductCategory parsedCategory = null;
+        if (category != null && !category.isBlank()) {
+            try {
+                parsedCategory = ProductCategory.valueOf(category.trim().toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                throw new BadRequestException("Invalid product category: " + category);
+            }
+        }
+
+        String searchName = (name != null && !name.isBlank()) ? name.trim() : null;
+
+        return productRepository.searchProducts(searchName, parsedCategory, pageRequest)
+                .map(productMapper::toResponse);
     }
 
     // ==================== Helpers ====================

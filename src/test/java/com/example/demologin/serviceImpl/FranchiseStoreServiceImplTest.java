@@ -67,7 +67,7 @@ class FranchiseStoreServiceImplTest {
     void setUp() {
         kitchen = Kitchen.builder().id("KIT001").name("Kitchen 1").build();
         store = Store.builder().id("ST001").name("Store 1").build();
-        product = Product.builder().id("PROD001").name("Product 1").unit("piece").build();
+        product = Product.builder().id("PROD001").name("Product 1").unit("piece").cost(BigDecimal.valueOf(10)).build();
         principal = mock(Principal.class);
     }
 
@@ -95,7 +95,7 @@ class FranchiseStoreServiceImplTest {
         when(request.getNotes()).thenReturn("Notes");
         when(request.getItems()).thenReturn(List.of(itemRequest));
 
-        when(productRepository.existsById("PROD001")).thenReturn(true);
+
         when(productRepository.findById("PROD001")).thenReturn(Optional.of(product));
         when(orderPriorityConfigRepository.findAll()).thenReturn(List.of(
                 OrderPriorityConfig.builder().priorityCode("HIGH").minDays(0).maxDays(0).build(),

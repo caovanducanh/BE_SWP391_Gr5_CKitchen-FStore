@@ -36,6 +36,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.security.Principal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -72,11 +73,14 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
         String orderId = generateOrderId();
         String priority = calculatePriority(request.getRequestedDate());
 
-        // Pre-check: Verify all products exist
+        BigDecimal totalCost = BigDecimal.ZERO;
+
+        // Pre-check: Verify all products exist and calculate total cost
         for (OrderItemRequest itemReq : request.getItems()) {
-            if (!productRepository.existsById(itemReq.getProductId())) {
-                throw new NotFoundException("Product not found: " + itemReq.getProductId());
-            }
+            Product product = productRepository.findById(itemReq.getProductId())
+                    .orElseThrow(() -> new NotFoundException("Product not found: " + itemReq.getProductId()));
+            BigDecimal itemCost = product.getCost().multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+            totalCost = totalCost.add(itemCost);
         }
 
         Order order = Order.builder()
@@ -88,6 +92,7 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
                 .requestedDate(request.getRequestedDate())
                 .notes(request.getNotes())
                 .createdBy(principal.getName())
+                .total(totalCost)
                 .updatedAt(LocalDateTime.now())
                 .build();
 

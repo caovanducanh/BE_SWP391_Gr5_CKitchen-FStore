@@ -50,12 +50,13 @@ class FranchiseStoreControllerTest {
     @Test
     void getOrders_shouldInvokeService() {
         Page<OrderResponse> page = new PageImpl<>(List.of());
-        when(franchiseStoreService.getOrders("ST001", "PENDING", 0, 20)).thenReturn(page);
+        Principal principal = mock(Principal.class);
+        when(franchiseStoreService.getOrders("PENDING", principal, 0, 20)).thenReturn(page);
 
-        Object result = controller.getOrders("ST001", "PENDING", 0, 20);
+        Object result = controller.getOrders("PENDING", 0, 20, principal);
 
         assertSame(page, result);
-        verify(franchiseStoreService).getOrders("ST001", "PENDING", 0, 20);
+        verify(franchiseStoreService).getOrders("PENDING", principal, 0, 20);
     }
 
     @Test
@@ -95,11 +96,12 @@ class FranchiseStoreControllerTest {
     @Test
     void getStoreInventory_shouldInvokeService() {
         Page<StoreInventoryResponse> page = new PageImpl<>(List.of());
-        when(franchiseStoreService.getStoreInventory("ST001", 0, 20)).thenReturn(page);
+        Principal principal = mock(Principal.class);
+        when(franchiseStoreService.getStoreInventory(null, null, principal, 0, 20)).thenReturn(page);
 
-        Object result = controller.getStoreInventory("ST001", 0, 20);
+        Object result = controller.getStoreInventory(null, null, 0, 20, principal);
 
         assertSame(page, result);
-        verify(franchiseStoreService).getStoreInventory("ST001", 0, 20);
+        verify(franchiseStoreService).getStoreInventory(null, null, principal, 0, 20);
     }
 }

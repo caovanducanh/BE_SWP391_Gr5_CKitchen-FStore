@@ -1,11 +1,13 @@
 package com.example.demologin.initializer.components;
 
 import com.example.demologin.entity.Batch;
+import com.example.demologin.entity.Delivery;
 import com.example.demologin.entity.Ingredient;
 import com.example.demologin.entity.InventoryDisposal;
 import com.example.demologin.entity.Kitchen;
 import com.example.demologin.entity.KitchenInventory;
 import com.example.demologin.entity.Order;
+import com.example.demologin.entity.OrderPriorityConfig;
 import com.example.demologin.entity.Product;
 import com.example.demologin.entity.ProductionPlan;
 import com.example.demologin.entity.SalesRecord;
@@ -13,11 +15,13 @@ import com.example.demologin.entity.Store;
 import com.example.demologin.entity.StoreInventory;
 import com.example.demologin.entity.User;
 import com.example.demologin.repository.BatchRepository;
+import com.example.demologin.repository.DeliveryRepository;
 import com.example.demologin.repository.IngredientRepository;
 import com.example.demologin.repository.InventoryDisposalRepository;
 import com.example.demologin.repository.KitchenInventoryRepository;
 import com.example.demologin.repository.KitchenRepository;
 import com.example.demologin.repository.OrderItemRepository;
+import com.example.demologin.repository.OrderPriorityConfigRepository;
 import com.example.demologin.repository.OrderRepository;
 import com.example.demologin.repository.ProductRepository;
 import com.example.demologin.repository.ProductionPlanRepository;
@@ -51,6 +55,8 @@ public class ManagerDashboardDataInitializer {
     private final SalesRecordRepository salesRecordRepository;
     private final InventoryDisposalRepository inventoryDisposalRepository;
     private final ProductRepository productRepository;
+    private final DeliveryRepository deliveryRepository;
+    private final OrderPriorityConfigRepository orderPriorityConfigRepository;
     private final IngredientRepository ingredientRepository;
     private final UserRepository userRepository;
 
@@ -58,8 +64,9 @@ public class ManagerDashboardDataInitializer {
     public void initializeManagerDashboardData() {
         log.info("Creating manager dashboard seed data...");
 
-        Store store = ensureStore();
+        ensurePriorityConfigs();
         Kitchen kitchen = ensureKitchen();
+        Store store = ensureStore();
 
         Product product1 = productRepository.findById("PROD001")
                 .orElseThrow(() -> new IllegalStateException("Product PROD001 not found"));
@@ -138,7 +145,26 @@ public class ManagerDashboardDataInitializer {
         ensureSalesRecords(store);
         ensureInventoryDisposals();
 
+        // ===== DELIVERIES =====
+        User coordinator = userRepository.findByUsername("supply")
+                .orElseThrow(() -> new IllegalStateException("Supply coordinator user not found"));
+
+        ensureDelivery("DEL001", order3, coordinator, "ASSIGNED", LocalDateTime.now().minusHours(2));
+        ensureDelivery("DEL002", order4, coordinator, "SHIPPING", LocalDateTime.now().minusDays(1));
+        ensureDelivery("DEL003", order5, coordinator, "DELIVERED", LocalDateTime.now().minusDays(2));
+
         log.info("✅ Manager dashboard seed data ready");
+    }
+
+    private void ensurePriorityConfigs() {
+        if (orderPriorityConfigRepository.count() > 0) return;
+
+        orderPriorityConfigRepository.saveAll(List.of(
+                OrderPriorityConfig.builder().priorityCode("HIGH").minDays(0).maxDays(0).description("Gấp: Giao trong ngày").build(),
+                OrderPriorityConfig.builder().priorityCode("NORMAL").minDays(1).maxDays(2).description("Vừa: Giao trong 1-2 ngày").build(),
+                OrderPriorityConfig.builder().priorityCode("LOW").minDays(3).maxDays(null).description("Thấp: Giao trên 2 ngày").build()
+        ));
+        log.info("✅ Order priority configurations initialized");
     }
 
     private Store ensureStore() {
@@ -213,6 +239,18 @@ public class ManagerDashboardDataInitializer {
                 .notes(notes)
                 .createdBy(createdBy)
                 .total(total)
+                .updatedAt(LocalDateTime.now())
+                .build()));
+    }
+
+    private void ensureDelivery(String id, Order order, User coordinator, String status, LocalDateTime assignedAt) {
+        deliveryRepository.findById(id).orElseGet(() -> deliveryRepository.save(Delivery.builder()
+                .id(id)
+                .order(order)
+                .coordinator(coordinator)
+                .status(status)
+                .assignedAt(assignedAt)
+                .createdAt(assignedAt.minusMinutes(30))
                 .updatedAt(LocalDateTime.now())
                 .build()));
     }

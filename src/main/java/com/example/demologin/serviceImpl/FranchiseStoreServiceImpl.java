@@ -11,17 +11,22 @@ import com.example.demologin.entity.Delivery;
 import com.example.demologin.entity.Kitchen;
 import com.example.demologin.entity.Order;
 import com.example.demologin.entity.OrderItem;
+import com.example.demologin.entity.OrderPriorityConfig;
 import com.example.demologin.entity.Product;
 import com.example.demologin.entity.Store;
 import com.example.demologin.entity.StoreInventory;
+import com.example.demologin.dto.response.StoreResponse;
+import com.example.demologin.entity.User;
 import com.example.demologin.exception.exceptions.NotFoundException;
 import com.example.demologin.repository.DeliveryRepository;
 import com.example.demologin.repository.KitchenRepository;
 import com.example.demologin.repository.OrderItemRepository;
+import com.example.demologin.repository.OrderPriorityConfigRepository;
 import com.example.demologin.repository.OrderRepository;
 import com.example.demologin.repository.ProductRepository;
 import com.example.demologin.repository.StoreInventoryRepository;
 import com.example.demologin.repository.StoreRepository;
+import com.example.demologin.repository.UserRepository;
 import com.example.demologin.service.FranchiseStoreService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -32,9 +37,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.Principal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -49,23 +57,33 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
     private final StoreRepository storeRepository;
     private final KitchenRepository kitchenRepository;
     private final ProductRepository productRepository;
+    private final OrderPriorityConfigRepository orderPriorityConfigRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request, Principal principal) {
-        Store store = storeRepository.findById(request.getStoreId())
-                .orElseThrow(() -> new NotFoundException("Store not found: " + request.getStoreId()));
-        Kitchen kitchen = kitchenRepository.findById(request.getKitchenId())
-                .orElseThrow(() -> new NotFoundException("Kitchen not found: " + request.getKitchenId()));
+        Store userStore = getCurrentStore(principal);
+        if (userStore == null) {
+            throw new IllegalStateException("Only store staff can create orders");
+        }
+        Store store = userStore;
 
         String orderId = generateOrderId();
+        String priority = calculatePriority(request.getRequestedDate());
+
+        // Pre-check: Verify all products exist
+        for (OrderItemRequest itemReq : request.getItems()) {
+            if (!productRepository.existsById(itemReq.getProductId())) {
+                throw new NotFoundException("Product not found: " + itemReq.getProductId());
+            }
+        }
 
         Order order = Order.builder()
                 .id(orderId)
                 .store(store)
-                .kitchen(kitchen)
                 .status("PENDING")
-                .priority(request.getPriority().trim().toUpperCase())
+                .priority(priority)
                 .createdAt(LocalDateTime.now())
                 .requestedDate(request.getRequestedDate())
                 .notes(request.getNotes())
@@ -84,21 +102,22 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
     }
 
     @Override
-    public Page<OrderResponse> getOrders(String storeId, String status, int page, int size) {
+    public Page<OrderResponse> getOrders(String status, Principal principal, int page, int size) {
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        boolean hasStore = storeId != null && !storeId.isBlank();
+        Store userStore = getCurrentStore(principal);
+        if (userStore == null) {
+            throw new IllegalStateException("Only store staff can view their orders");
+        }
+        String finalStoreId = userStore.getId();
+
         boolean hasStatus = status != null && !status.isBlank();
 
         Page<Order> orders;
-        if (hasStore && hasStatus) {
-            orders = orderRepository.findByStore_IdAndStatus(storeId, status.toUpperCase(), pageRequest);
-        } else if (hasStore) {
-            orders = orderRepository.findByStore_Id(storeId, pageRequest);
-        } else if (hasStatus) {
-            orders = orderRepository.findByStatus(status.toUpperCase(), pageRequest);
+        if (hasStatus) {
+            orders = orderRepository.findByStore_IdAndStatus(finalStoreId, status.toUpperCase(), pageRequest);
         } else {
-            orders = orderRepository.findAll(pageRequest);
+            orders = orderRepository.findByStore_Id(finalStoreId, pageRequest);
         }
 
         return orders.map(o -> {
@@ -149,23 +168,56 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
     }
 
     @Override
-    public Page<StoreInventoryResponse> getStoreInventory(String storeId, int page, int size) {
-        if (storeId != null && !storeId.isBlank()) {
-            storeRepository.findById(storeId)
-                    .orElseThrow(() -> new NotFoundException("Store not found: " + storeId));
+    public Page<StoreInventoryResponse> getStoreInventory(String productId, String productName, Principal principal, int page, int size) {
+        Store userStore = getCurrentStore(principal);
+        if (userStore == null) {
+            throw new IllegalStateException("Only store staff can view their inventory");
         }
+        String finalStoreId = userStore.getId();
 
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by("product.name"));
 
-        Specification<StoreInventory> spec = Specification.where(null);
-        if (storeId != null && !storeId.isBlank()) {
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("store").get("id"), storeId));
+        Specification<StoreInventory> spec = Specification.where((root, query, cb) -> 
+                cb.equal(root.get("store").get("id"), finalStoreId));
+
+        if (productId != null && !productId.isBlank()) {
+            if (!productRepository.existsById(productId)) {
+                throw new NotFoundException("Product not found: " + productId);
+            }
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("product").get("id"), productId));
+        }
+
+        if (productName != null && !productName.isBlank()) {
+            String searchPattern = "%" + productName.toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("product").get("name")), searchPattern));
         }
 
         return storeInventoryRepository.findAll(spec, pageRequest).map(this::toInventoryResponse);
     }
 
+    @Override
+    public StoreResponse getMyStore(Principal principal) {
+        Store store = getCurrentStore(principal);
+        if (store == null) {
+            throw new NotFoundException("Current user is not associated with any store");
+        }
+        return toStoreResponse(store);
+    }
+
     // ==================== Helpers ====================
+    private String calculatePriority(LocalDate requestedDate) {
+        long daysBetween = ChronoUnit.DAYS.between(LocalDate.now(), requestedDate);
+        if (daysBetween < 0) {
+            daysBetween = 0; // Treat past or today as same for priority
+        }
+
+        long finalDaysBetween = daysBetween;
+        return orderPriorityConfigRepository.findAll().stream()
+                .filter(config -> finalDaysBetween >= config.getMinDays() && (config.getMaxDays() == null || finalDaysBetween <= config.getMaxDays()))
+                .map(OrderPriorityConfig::getPriorityCode)
+                .findFirst()
+                .orElse("NORMAL");
+    }
 
     private OrderItem buildOrderItem(OrderItemRequest req, Order order) {
         Product product = productRepository.findById(req.getProductId())
@@ -174,7 +226,7 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
                 .order(order)
                 .product(product)
                 .quantity(req.getQuantity())
-                .unit(req.getUnit().trim())
+                .unit(product.getUnit())
                 .createdAt(LocalDateTime.now())
                 .build();
     }
@@ -199,8 +251,8 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
                 .id(order.getId())
                 .storeId(order.getStore().getId())
                 .storeName(order.getStore().getName())
-                .kitchenId(order.getKitchen().getId())
-                .kitchenName(order.getKitchen().getName())
+                .kitchenId(order.getKitchen() != null ? order.getKitchen().getId() : null)
+                .kitchenName(order.getKitchen() != null ? order.getKitchen().getName() : null)
                 .status(order.getStatus())
                 .priority(order.getPriority())
                 .createdAt(order.getCreatedAt())
@@ -243,5 +295,33 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
                 .updatedAt(inv.getUpdatedAt())
                 .lowStock(inv.getQuantity() <= inv.getMinStock())
                 .build();
+    }
+
+    private StoreResponse toStoreResponse(Store store) {
+        return StoreResponse.builder()
+                .id(store.getId())
+                .name(store.getName())
+                .address(store.getAddress())
+                .phone(store.getPhone())
+                .manager(store.getManager())
+                .status(store.getStatus())
+                .openDate(store.getOpenDate())
+                .createdAt(store.getCreatedAt())
+                .updatedAt(store.getUpdatedAt())
+                .build();
+    }
+
+    private Store getCurrentStore(Principal principal) {
+        if (principal == null) return null;
+        User user = userRepository.findByUsername(principal.getName())
+                .orElseThrow(() -> new NotFoundException("User not found: " + principal.getName()));
+
+        if (user.getRole() != null && user.getRole().getName().equalsIgnoreCase("FRANCHISE_STORE_STAFF")) {
+            if (user.getStore() == null) {
+                throw new IllegalStateException("Store staff is not assigned to any store");
+            }
+            return user.getStore();
+        }
+        return null;
     }
 }

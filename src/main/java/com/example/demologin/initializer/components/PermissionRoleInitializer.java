@@ -57,6 +57,7 @@ public class PermissionRoleInitializer {
     private static final String RECIPE_MANAGE = "RECIPE_MANAGE";
     private static final String INVENTORY_VIEW = "INVENTORY_VIEW";
     private static final String MANAGER_DASHBOARD_VIEW = "MANAGER_DASHBOARD_VIEW";
+    private static final String STORE_VIEW = "STORE_VIEW";
 
     // Franchise Store Staff permissions
     private static final String ORDER_VIEW = "ORDER_VIEW";
@@ -108,6 +109,7 @@ public class PermissionRoleInitializer {
                 ensurePermission(RECIPE_MANAGE, "Quản lý công thức và định mức nguyên liệu");
                 ensurePermission(INVENTORY_VIEW, "Xem tồn kho bếp trung tâm và cửa hàng");
                 ensurePermission(MANAGER_DASHBOARD_VIEW, "Xem dashboard vận hành manager");
+                ensurePermission(STORE_VIEW, "Xem thông tin chi nhánh cửa hàng");
                 ensurePermission(ORDER_VIEW, "Xem đơn đặt hàng");
                 ensurePermission(ORDER_CREATE, "Tạo đơn đặt hàng nguyên liệu từ bếp trung tâm");
                 ensurePermission(DELIVERY_VIEW, "Xem trạng thái giao hàng");
@@ -151,6 +153,7 @@ public class PermissionRoleInitializer {
         managerPerms.add(permMap.get(RECIPE_MANAGE));
         managerPerms.add(permMap.get(INVENTORY_VIEW));
         managerPerms.add(permMap.get(MANAGER_DASHBOARD_VIEW));
+        managerPerms.add(permMap.get(STORE_VIEW));
 
         // Supply coordinator: nghiệp vụ điều phối + xem log
         Set<Permission> supplyCoordinatorPerms = new HashSet<>(operationalPerms);
@@ -168,6 +171,7 @@ public class PermissionRoleInitializer {
         franchiseStorePerms.add(permMap.get(DELIVERY_VIEW));
         franchiseStorePerms.add(permMap.get(DELIVERY_CONFIRM));
         franchiseStorePerms.add(permMap.get(STORE_INVENTORY_VIEW));
+        franchiseStorePerms.add(permMap.get(STORE_VIEW));
         ensureRole(ROLE_FRANCHISE_STORE_STAFF, franchiseStorePerms);
 
         ensureRole(ROLE_SHIPPER, operationalPerms);

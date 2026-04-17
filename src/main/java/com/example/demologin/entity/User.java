@@ -47,8 +47,12 @@ public class User implements UserDetails {
     @Column(name = "full_name", nullable = false, length = 100)
     private String fullName;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false, length = 255, unique = true)
     private String email;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "store_id")
+    private Store store;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
@@ -178,6 +182,14 @@ public class User implements UserDetails {
     
     public void setFullName(String fullName) {
         this.fullName = fullName;
+    }
+
+    public Store getStore() {
+        return store;
+    }
+
+    public void setStore(Store store) {
+        this.store = store;
     }
     
     public UserStatus getStatus() {

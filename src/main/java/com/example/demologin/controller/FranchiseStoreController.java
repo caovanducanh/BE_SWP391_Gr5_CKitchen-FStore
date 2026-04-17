@@ -43,19 +43,18 @@ public class FranchiseStoreController {
     @SecuredEndpoint("ORDER_VIEW")
     @Operation(
             summary = "Danh sách đơn đặt hàng",
-            description = "Xem danh sách đơn đặt hàng của cửa hàng. Lọc theo storeId và/hoặc status."
+            description = "Xem danh sách đơn đặt hàng của cửa hàng. Lọc theo status."
     )
     public Object getOrders(
-            @Parameter(description = "Store ID to filter orders", example = "ST001")
-            @RequestParam(required = false) String storeId,
             @Parameter(description = "Order status filter (PENDING, PROCESSING, APPROVED, SHIPPING, DELIVERED, CANCELLED)", example = "PENDING")
             @RequestParam(required = false) String status,
             @Parameter(description = "Page index (0-based)", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "20")
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            Principal principal
     ) {
-        return franchiseStoreService.getOrders(storeId, status, page, size);
+        return franchiseStoreService.getOrders(status, principal, page, size);
     }
 
     @GetMapping("/orders/{orderId}")
@@ -107,17 +106,33 @@ public class FranchiseStoreController {
     @SecuredEndpoint("STORE_INVENTORY_VIEW")
     @Operation(
             summary = "Xem tồn kho cửa hàng",
-            description = "Xem tồn kho hiện tại tại cửa hàng. Lọc theo storeId. " +
+            description = "Xem tồn kho hiện tại tại cửa hàng. " +
                     "Trả về cờ lowStock=true nếu quantity <= minStock."
     )
     public Object getStoreInventory(
-            @Parameter(description = "Store ID", example = "ST001")
-            @RequestParam(required = false) String storeId,
+            @Parameter(description = "Product ID to search for", example = "PROD001")
+            @RequestParam(required = false) String productId,
+            @Parameter(description = "Product name to search for (partial match)", example = "Bánh")
+            @RequestParam(required = false) String productName,
             @Parameter(description = "Page index (0-based)", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "20")
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            Principal principal
     ) {
-        return franchiseStoreService.getStoreInventory(storeId, page, size);
+        return franchiseStoreService.getStoreInventory(productId, productName, principal, page, size);
+    }
+
+    // ==================== Store Information ====================
+
+    @GetMapping("/my-store")
+    @ApiResponse(message = "Store information retrieved successfully")
+    @SecuredEndpoint("STORE_VIEW")
+    @Operation(
+            summary = "Thông tin cửa hàng của tôi",
+            description = "Lấy thông tin chi tiết về chi nhánh cửa hàng mà nhân viên đang làm việc."
+    )
+    public Object getMyStore(Principal principal) {
+        return franchiseStoreService.getMyStore(principal);
     }
 }

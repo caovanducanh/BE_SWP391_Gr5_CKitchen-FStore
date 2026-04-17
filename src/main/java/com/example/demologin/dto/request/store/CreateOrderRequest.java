@@ -12,14 +12,7 @@ import java.util.List;
 @Getter
 public class CreateOrderRequest {
 
-    @NotBlank(message = "storeId is required")
-    private String storeId;
 
-    @NotBlank(message = "kitchenId is required")
-    private String kitchenId;
-
-    @NotBlank(message = "priority is required")
-    private String priority;
 
     @NotNull(message = "requestedDate is required")
     private LocalDate requestedDate;

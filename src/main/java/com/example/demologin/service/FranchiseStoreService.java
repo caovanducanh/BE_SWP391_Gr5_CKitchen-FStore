@@ -1,5 +1,7 @@
 package com.example.demologin.service;
 
+import com.example.demologin.dto.response.ProductResponse;
+
 import com.example.demologin.dto.request.store.ConfirmReceiptRequest;
 import com.example.demologin.dto.request.store.CreateOrderRequest;
 import com.example.demologin.dto.response.DeliveryResponse;
@@ -18,4 +20,5 @@ public interface FranchiseStoreService {
     DeliveryResponse confirmReceipt(String deliveryId, ConfirmReceiptRequest request);
     Page<StoreInventoryResponse> getStoreInventory(String productId, String productName, Principal principal, int page, int size);
     StoreResponse getMyStore(Principal principal);
+    Page<ProductResponse> getAvailableProducts(String name, String category, int page, int size);
 }

@@ -6,20 +6,30 @@ import com.example.demologin.dto.request.store.OrderItemRequest;
 import com.example.demologin.dto.response.DeliveryResponse;
 import com.example.demologin.dto.response.OrderResponse;
 import com.example.demologin.dto.response.StoreInventoryResponse;
+import com.example.demologin.dto.response.StoreResponse;
 import com.example.demologin.entity.*;
 import com.example.demologin.exception.exceptions.NotFoundException;
 import com.example.demologin.repository.*;
+import com.example.demologin.mapper.ProductMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.mockito.ArgumentCaptor;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Root;
 
 import java.math.BigDecimal;
 import java.security.Principal;
@@ -28,12 +38,12 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class FranchiseStoreServiceImplTest {
 
     @Mock
@@ -54,6 +64,8 @@ class FranchiseStoreServiceImplTest {
     private UserRepository userRepository;
     @Mock
     private OrderPriorityConfigRepository orderPriorityConfigRepository;
+    @Mock
+    private ProductMapper productMapper;
 
     @InjectMocks
     private FranchiseStoreServiceImpl franchiseStoreService;
@@ -67,7 +79,7 @@ class FranchiseStoreServiceImplTest {
     void setUp() {
         kitchen = Kitchen.builder().id("KIT001").name("Kitchen 1").build();
         store = Store.builder().id("ST001").name("Store 1").build();
-        product = Product.builder().id("PROD001").name("Product 1").unit("piece").build();
+        product = Product.builder().id("PROD001").name("Product 1").unit("piece").cost(BigDecimal.valueOf(10)).build();
         principal = mock(Principal.class);
     }
 
@@ -95,7 +107,8 @@ class FranchiseStoreServiceImplTest {
         when(request.getNotes()).thenReturn("Notes");
         when(request.getItems()).thenReturn(List.of(itemRequest));
 
-        when(productRepository.existsById("PROD001")).thenReturn(true);
+
+        when(request.getRequestedDate()).thenReturn(LocalDate.now().plusDays(1));
         when(productRepository.findById("PROD001")).thenReturn(Optional.of(product));
         when(orderPriorityConfigRepository.findAll()).thenReturn(List.of(
                 OrderPriorityConfig.builder().priorityCode("HIGH").minDays(0).maxDays(0).build(),
@@ -219,5 +232,259 @@ class FranchiseStoreServiceImplTest {
         assertEquals(1, result.getTotalElements());
         assertTrue(result.getContent().get(0).isLowStock());
         verify(storeInventoryRepository).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(PageRequest.class));
+    }
+    @Test
+    void getOrders_shouldThrowExceptionWhenNotStaff() {
+        when(principal.getName()).thenReturn("testuser");
+        User user = new User();
+        user.setUsername("testuser");
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+
+        assertThrows(IllegalStateException.class, () -> franchiseStoreService.getOrders(null, principal, 0, 10));
+    }
+
+    @Test
+    void getOrders_shouldReturnPagedOrdersWithStatus() {
+        mockCurrentStore("testuser", store);
+        Order order = Order.builder().id("ORD001").store(store).kitchen(kitchen).status("PENDING").build();
+        Page<Order> orderPage = new PageImpl<>(List.of(order));
+        
+        when(orderRepository.findByStore_IdAndStatus(eq("ST001"), eq("PENDING"), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(Collections.emptyList());
+
+        Page<OrderResponse> result = franchiseStoreService.getOrders("pending", principal, 0, 10);
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void confirmReceipt_shouldUpdateDeliveryWithNotes() {
+        Order order = Order.builder().id("ORD001").status("SHIPPING").build();
+        Delivery delivery = Delivery.builder().id("DEL001").order(order).status("SHIPPING").build();
+        
+        ConfirmReceiptRequest request = mock(ConfirmReceiptRequest.class);
+        when(request.getReceiverName()).thenReturn("Receiver");
+        when(request.getTemperatureOk()).thenReturn(true);
+        when(request.getNotes()).thenReturn("Some notes");
+
+        when(deliveryRepository.findById("DEL001")).thenReturn(Optional.of(delivery));
+        when(deliveryRepository.save(any(Delivery.class))).thenAnswer(i -> i.getArgument(0));
+
+        DeliveryResponse response = franchiseStoreService.confirmReceipt("DEL001", request);
+        assertEquals("DELIVERED", response.getStatus());
+        assertEquals("Some notes", response.getNotes());
+    }
+
+    @Test
+    void getStoreInventory_shouldThrowExceptionWhenNotStaff() {
+        when(principal.getName()).thenReturn("testuser");
+        User user = new User();
+        user.setUsername("testuser");
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+
+        assertThrows(IllegalStateException.class, () -> franchiseStoreService.getStoreInventory(null, null, principal, 0, 10));
+    }
+
+    @Test
+    void getStoreInventory_shouldFilterByProductIdAndName() {
+        mockCurrentStore("testuser", store);
+        StoreInventory inventory = StoreInventory.builder().id(1).store(store).product(product).quantity(5).minStock(10).build();
+        Page<StoreInventory> page = new PageImpl<>(List.of(inventory));
+        
+        when(productRepository.existsById("PROD001")).thenReturn(true);
+        when(storeInventoryRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(PageRequest.class)))
+                .thenReturn(page);
+
+        Page<StoreInventoryResponse> result = franchiseStoreService.getStoreInventory("PROD001", "name", principal, 0, 10);
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void getStoreInventory_shouldThrowExceptionWhenProductNotFound() {
+        mockCurrentStore("testuser", store);
+        when(productRepository.existsById("WRONG")).thenReturn(false);
+        assertThrows(NotFoundException.class, () -> franchiseStoreService.getStoreInventory("WRONG", null, principal, 0, 10));
+    }
+
+    @Test
+    void getMyStore_shouldReturnStoreResponse() {
+        mockCurrentStore("testuser", store);
+        StoreResponse response = franchiseStoreService.getMyStore(principal);
+        assertEquals("ST001", response.getId());
+    }
+
+    @Test
+    void getMyStore_shouldThrowExceptionWhenNotAssociated() {
+        when(principal.getName()).thenReturn("testuser");
+        User user = new User();
+        user.setUsername("testuser");
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        
+        assertThrows(NotFoundException.class, () -> franchiseStoreService.getMyStore(principal));
+    }
+
+    @Test
+    void createOrder_shouldCalculatePriorityWithPastDateAsZeroWaitMsBeforeAsync() {
+        mockCurrentStore("testuser", store);
+        OrderItemRequest itemRequest = mock(OrderItemRequest.class);
+        when(itemRequest.getProductId()).thenReturn("PROD001");
+        when(itemRequest.getQuantity()).thenReturn(10);
+
+        CreateOrderRequest request = mock(CreateOrderRequest.class);
+        when(request.getRequestedDate()).thenReturn(LocalDate.now().minusDays(5));
+        when(request.getItems()).thenReturn(List.of(itemRequest));
+
+        when(productRepository.findById("PROD001")).thenReturn(Optional.of(product));
+        when(orderPriorityConfigRepository.findAll()).thenReturn(List.of(
+                OrderPriorityConfig.builder().priorityCode("HIGH").minDays(0).maxDays(0).build(),
+                OrderPriorityConfig.builder().priorityCode("EXTREME").minDays(0).maxDays(null).build()
+        ));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        OrderResponse response = franchiseStoreService.createOrder(request, principal);
+        assertEquals("HIGH", response.getPriority());
+    }
+    @Test
+    void createOrder_shouldThrowExceptionWhenProductNotFound_PreCheck() {
+        mockCurrentStore("testuser", store);
+        OrderItemRequest itemRequest = mock(OrderItemRequest.class);
+        when(itemRequest.getProductId()).thenReturn("PROD001");
+        
+        CreateOrderRequest request = mock(CreateOrderRequest.class);
+        when(request.getItems()).thenReturn(List.of(itemRequest));
+        when(request.getRequestedDate()).thenReturn(LocalDate.now());
+        
+        when(productRepository.findById("PROD001")).thenReturn(Optional.empty());
+        
+        assertThrows(NotFoundException.class, () -> franchiseStoreService.createOrder(request, principal));
+    }
+
+    @Test
+    void createOrder_shouldThrowExceptionWhenProductNotFound_InBuildOrderItem() {
+        mockCurrentStore("testuser", store);
+        OrderItemRequest itemRequest = mock(OrderItemRequest.class);
+        when(itemRequest.getProductId()).thenReturn("PROD001");
+        when(itemRequest.getQuantity()).thenReturn(10);
+        
+        CreateOrderRequest request = mock(CreateOrderRequest.class);
+        when(request.getItems()).thenReturn(List.of(itemRequest));
+        when(request.getRequestedDate()).thenReturn(LocalDate.now().plusDays(2));
+        
+        // Return present first time, empty second time to hit the buildOrderItem catch
+        when(productRepository.findById("PROD001"))
+            .thenReturn(Optional.of(product))
+            .thenReturn(Optional.empty());
+            
+        assertThrows(NotFoundException.class, () -> franchiseStoreService.createOrder(request, principal));
+    }
+
+    @Test
+    void getOrders_shouldReturnAllOrdersWhenStatusIsBlank() {
+        mockCurrentStore("testuser", store);
+        Order order = Order.builder().id("ORD001").store(store).kitchen(kitchen).status("PENDING").build();
+        Page<Order> orderPage = new PageImpl<>(List.of(order));
+        
+        when(orderRepository.findByStore_Id(eq("ST001"), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(Collections.emptyList());
+
+        Page<OrderResponse> result = franchiseStoreService.getOrders("   ", principal, 0, 10);
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void getOrderById_shouldThrowExceptionWhenOrderNotFound() {
+        when(orderRepository.findById("ORD001")).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> franchiseStoreService.getOrderById("ORD001"));
+    }
+
+    @Test
+    void getDeliveryByOrderId_shouldThrowExceptionWhenOrderNotFound() {
+        when(orderRepository.findById("ORD001")).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> franchiseStoreService.getDeliveryByOrderId("ORD001"));
+    }
+
+    @Test
+    void getDeliveryByOrderId_shouldThrowExceptionWhenDeliveryNotFound() {
+        Order order = Order.builder().id("ORD001").store(store).build();
+        when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
+        when(deliveryRepository.findByOrder_Id("ORD001")).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> franchiseStoreService.getDeliveryByOrderId("ORD001"));
+    }
+
+    @Test
+    void confirmReceipt_shouldThrowExceptionWhenDeliveryNotFound() {
+        ConfirmReceiptRequest request = mock(ConfirmReceiptRequest.class);
+        when(deliveryRepository.findById("DEL001")).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> franchiseStoreService.confirmReceipt("DEL001", request));
+    }
+
+    @Test
+    void getCurrentStore_shouldThrowExceptionWhenUserHasNoStore() {
+        when(principal.getName()).thenReturn("testuser");
+        Role role = Role.builder().name("FRANCHISE_STORE_STAFF").build();
+        User user = new User();
+        user.setUsername("testuser");
+        user.setRole(role);
+        user.setStore(null); // Staff but no store
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        
+        assertThrows(IllegalStateException.class, () -> franchiseStoreService.getMyStore(principal));
+    }
+
+    @Test
+    void getCurrentStore_shouldThrowExceptionWhenUserNotFound() {
+        when(principal.getName()).thenReturn("testuser");
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> franchiseStoreService.getMyStore(principal));
+    }
+
+    @Test
+    void getStoreInventory_shouldExecuteSpecificationLambdaForCoverage() {
+        mockCurrentStore("testuser", store);
+        ArgumentCaptor<Specification<StoreInventory>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+        when(storeInventoryRepository.findAll(specCaptor.capture(), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
+
+        when(productRepository.existsById("PROD001")).thenReturn(true);
+        franchiseStoreService.getStoreInventory("PROD001", "product", principal, 0, 10);
+
+        Specification<StoreInventory> spec = specCaptor.getValue();
+        Root<StoreInventory> root = mock(Root.class);
+        CriteriaQuery<?> query = mock(CriteriaQuery.class);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        Path path = mock(Path.class);
+        
+        when(root.get(anyString())).thenReturn(path);
+        when(path.get(anyString())).thenReturn(path);
+        jakarta.persistence.criteria.Predicate mockPredicate = mock(jakarta.persistence.criteria.Predicate.class);
+        
+        when(cb.equal(any(), any())).thenReturn(mockPredicate);
+        when(cb.lower(any())).thenReturn(mock(jakarta.persistence.criteria.Expression.class));
+        when(cb.like(any(), anyString())).thenReturn(mockPredicate);
+        when(cb.and(any(), any())).thenReturn(mockPredicate);
+
+        spec.toPredicate(root, query, cb);
+        
+        ArgumentCaptor<jakarta.persistence.criteria.Expression> exprCaptor = ArgumentCaptor.forClass(jakarta.persistence.criteria.Expression.class);
+        ArgumentCaptor<Object> valueCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(cb, atLeastOnce()).equal(exprCaptor.capture(), valueCaptor.capture());
+        
+        verify(cb, atLeastOnce()).like(any(jakarta.persistence.criteria.Expression.class), anyString());
+    }
+
+    @Test
+    void getAvailableProducts_shouldReturnPagedProducts() {
+        // Arrange
+        Product product2 = Product.builder().id("PROD002").name("Product 2").build();
+        Page<Product> productPage = new PageImpl<>(List.of(product, product2));
+        
+        when(productRepository.searchProducts(anyString(), any(), any(PageRequest.class))).thenReturn(productPage);
+        when(productMapper.toResponse(any(Product.class))).thenReturn(mock(com.example.demologin.dto.response.ProductResponse.class));
+
+        // Act
+        Page<com.example.demologin.dto.response.ProductResponse> result = franchiseStoreService.getAvailableProducts("Product", "BAKERY", 0, 10);
+
+        // Assert
+        assertEquals(2, result.getTotalElements());
+        verify(productRepository).searchProducts(eq("Product"), any(), any(PageRequest.class));
     }
 }

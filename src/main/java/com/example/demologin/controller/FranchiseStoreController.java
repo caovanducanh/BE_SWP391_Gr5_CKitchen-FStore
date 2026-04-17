@@ -135,4 +135,27 @@ public class FranchiseStoreController {
     public Object getMyStore(Principal principal) {
         return franchiseStoreService.getMyStore(principal);
     }
+
+    // ==================== Product Catalog ====================
+
+    @GetMapping("/products")
+    @PageResponse
+    @ApiResponse(message = "Products retrieved successfully")
+    @SecuredEndpoint("ORDER_CREATE")
+    @Operation(
+            summary = "Danh sách sản phẩm để đặt hàng",
+            description = "Xem danh sách sản phẩm có sẵn để đặt hàng từ bếp trung tâm. Hỗ trợ lọc theo tên và category."
+    )
+    public Object getAvailableProducts(
+            @Parameter(description = "Product name to search for (partial match)", example = "Bánh")
+            @RequestParam(required = false) String name,
+            @Parameter(description = "Product category filter (BAKERY, BEVERAGE, SNACK, FROZEN, OTHER)", example = "BAKERY")
+            @RequestParam(required = false) String category,
+            @Parameter(description = "Page index (0-based)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "20")
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return franchiseStoreService.getAvailableProducts(name, category, page, size);
+    }
 }

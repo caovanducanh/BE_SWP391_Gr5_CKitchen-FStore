@@ -34,8 +34,8 @@ public class Order {
     @JoinColumn(name = "store_id", nullable = false)
     private Store store;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "kitchen_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "kitchen_id", nullable = true)
     private Kitchen kitchen;
 
     @Column(nullable = false, length = 20)

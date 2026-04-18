@@ -4,7 +4,9 @@ import com.example.demologin.dto.request.store.ConfirmReceiptRequest;
 import com.example.demologin.dto.request.store.CreateOrderRequest;
 import com.example.demologin.dto.response.DeliveryResponse;
 import com.example.demologin.dto.response.OrderResponse;
+import com.example.demologin.dto.response.OrderTimelineResponse;
 import com.example.demologin.dto.response.StoreInventoryResponse;
+import com.example.demologin.dto.response.StoreOverviewResponse;
 import com.example.demologin.service.FranchiseStoreService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,14 +73,27 @@ class FranchiseStoreControllerTest {
     }
 
     @Test
-    void getDeliveryByOrderId_shouldInvokeService() {
-        DeliveryResponse response = DeliveryResponse.builder().id("DEL001").build();
-        when(franchiseStoreService.getDeliveryByOrderId("ORD001")).thenReturn(response);
+    void getOrderTimeline_shouldInvokeService() {
+        Principal principal = mock(Principal.class);
+        OrderTimelineResponse response = OrderTimelineResponse.builder().orderId("ORD001").build();
+        when(franchiseStoreService.getOrderTimeline("ORD001", principal)).thenReturn(response);
 
-        Object result = controller.getDeliveryByOrderId("ORD001");
+        Object result = controller.getOrderTimeline("ORD001", principal);
 
         assertSame(response, result);
-        verify(franchiseStoreService).getDeliveryByOrderId("ORD001");
+        verify(franchiseStoreService).getOrderTimeline("ORD001", principal);
+    }
+
+    @Test
+    void getDeliveries_shouldInvokeService() {
+        Page<DeliveryResponse> page = new PageImpl<>(List.of());
+        Principal principal = mock(Principal.class);
+        when(franchiseStoreService.getDeliveries("SHIPPING", principal, 0, 20)).thenReturn(page);
+
+        Object result = controller.getDeliveries("SHIPPING", 0, 20, principal);
+
+        assertSame(page, result);
+        verify(franchiseStoreService).getDeliveries("SHIPPING", principal, 0, 20);
     }
 
     @Test
@@ -103,5 +118,28 @@ class FranchiseStoreControllerTest {
 
         assertSame(page, result);
         verify(franchiseStoreService).getStoreInventory(null, null, principal, 0, 20);
+    }
+
+    @Test
+    void getOverview_shouldInvokeService() {
+        Principal principal = mock(Principal.class);
+        StoreOverviewResponse response = StoreOverviewResponse.builder().storeId("ST001").build();
+        when(franchiseStoreService.getOverview(principal)).thenReturn(response);
+
+        Object result = controller.getOverview(principal);
+
+        assertSame(response, result);
+        verify(franchiseStoreService).getOverview(principal);
+    }
+
+    @Test
+    void getOrderStatuses_shouldInvokeService() {
+        List<String> statuses = List.of("PENDING", "IN_PROGRESS");
+        when(franchiseStoreService.getOrderStatuses()).thenReturn(statuses);
+
+        Object result = controller.getOrderStatuses();
+
+        assertSame(statuses, result);
+        verify(franchiseStoreService).getOrderStatuses();
     }
 }

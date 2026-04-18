@@ -8,6 +8,7 @@ import com.example.demologin.entity.KitchenInventory;
 import com.example.demologin.entity.Product;
 import com.example.demologin.entity.Store;
 import com.example.demologin.entity.StoreInventory;
+import com.example.demologin.enums.OrderStatus;
 import com.example.demologin.enums.ProductCategory;
 import com.example.demologin.repository.BatchRepository;
 import com.example.demologin.repository.IngredientRepository;
@@ -65,7 +66,15 @@ class ManagerDashboardServiceImplTest {
         when(recipeRepository.count()).thenReturn(9L);
         when(productionPlanRepository.countByStatusIn(List.of("PLANNED", "IN_PROGRESS"))).thenReturn(2L);
         when(batchRepository.countByStatusIn(List.of("IN_PROGRESS"))).thenReturn(3L);
-        when(orderRepository.countByStatusIn(List.of("PENDING", "APPROVED", "PROCESSING"))).thenReturn(4L);
+        when(orderRepository.countByStatusIn(List.of(
+            OrderStatus.PENDING,
+            OrderStatus.ASSIGNED,
+            OrderStatus.IN_PROGRESS,
+            OrderStatus.PACKED_WAITING_SHIPPER,
+            OrderStatus.SHIPPING,
+            OrderStatus.APPROVED,
+            OrderStatus.PROCESSING
+        ))).thenReturn(4L);
         when(kitchenInventoryRepository.countLowStockItems()).thenReturn(1L);
         when(storeInventoryRepository.countLowStockItems()).thenReturn(6L);
         when(salesRecordRepository.sumTotalRevenue()).thenReturn(BigDecimal.valueOf(123.45));
@@ -92,7 +101,15 @@ class ManagerDashboardServiceImplTest {
         when(recipeRepository.count()).thenReturn(0L);
         when(productionPlanRepository.countByStatusIn(List.of("PLANNED", "IN_PROGRESS"))).thenReturn(0L);
         when(batchRepository.countByStatusIn(List.of("IN_PROGRESS"))).thenReturn(0L);
-        when(orderRepository.countByStatusIn(List.of("PENDING", "APPROVED", "PROCESSING"))).thenReturn(0L);
+        when(orderRepository.countByStatusIn(List.of(
+            OrderStatus.PENDING,
+            OrderStatus.ASSIGNED,
+            OrderStatus.IN_PROGRESS,
+            OrderStatus.PACKED_WAITING_SHIPPER,
+            OrderStatus.SHIPPING,
+            OrderStatus.APPROVED,
+            OrderStatus.PROCESSING
+        ))).thenReturn(0L);
         when(kitchenInventoryRepository.countLowStockItems()).thenReturn(0L);
         when(storeInventoryRepository.countLowStockItems()).thenReturn(0L);
         when(salesRecordRepository.sumTotalRevenue()).thenReturn(null);

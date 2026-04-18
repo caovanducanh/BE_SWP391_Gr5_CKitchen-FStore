@@ -14,6 +14,8 @@ import java.time.LocalDate;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, String>, JpaSpecificationExecutor<Order> {
     long countByStatusIn(Collection<OrderStatus> statuses);
+    long countByStore_Id(String storeId);
+    long countByStore_IdAndStatus(String storeId, OrderStatus status);
     long countByStatusAndKitchenIsNull(OrderStatus status);
     long countByKitchen_IdAndStatusIn(String kitchenId, Collection<OrderStatus> statuses);
     long countByKitchen_IdAndStatus(String kitchenId, OrderStatus status);

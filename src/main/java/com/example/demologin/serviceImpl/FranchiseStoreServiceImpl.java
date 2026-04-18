@@ -9,6 +9,7 @@ import com.example.demologin.dto.response.OrderItemResponse;
 import com.example.demologin.dto.response.OrderResponse;
 import com.example.demologin.dto.response.OrderTimelineResponse;
 import com.example.demologin.dto.response.StoreInventoryResponse;
+import com.example.demologin.dto.response.StoreOverviewResponse;
 import com.example.demologin.entity.Delivery;
 import com.example.demologin.entity.Kitchen;
 import com.example.demologin.entity.Order;
@@ -50,6 +51,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Collections;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -175,12 +177,22 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
     }
 
     @Override
-    public DeliveryResponse getDeliveryByOrderId(String orderId) {
-        orderRepository.findById(orderId)
-                .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
-        Delivery delivery = deliveryRepository.findByOrder_Id(orderId)
-                .orElseThrow(() -> new NotFoundException("No delivery found for order: " + orderId));
-        return toDeliveryResponse(delivery);
+    public Page<DeliveryResponse> getDeliveries(String status, Principal principal, int page, int size) {
+        Store currentStore = getCurrentStore(principal);
+        if (currentStore == null) {
+            throw new IllegalStateException("Only store staff can view deliveries");
+        }
+
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "assignedAt"));
+        Page<Delivery> deliveries;
+
+        if (status != null && !status.isBlank()) {
+            deliveries = deliveryRepository.findByOrder_Store_IdAndStatus(currentStore.getId(), status.trim().toUpperCase(), pageRequest);
+        } else {
+            deliveries = deliveryRepository.findByOrder_Store_Id(currentStore.getId(), pageRequest);
+        }
+
+        return deliveries.map(this::toDeliveryResponse);
     }
 
     @Override
@@ -245,6 +257,45 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
             throw new NotFoundException("Current user is not associated with any store");
         }
         return toStoreResponse(store);
+    }
+
+    @Override
+    public StoreOverviewResponse getOverview(Principal principal) {
+        Store store = getCurrentStore(principal);
+        if (store == null) {
+            throw new IllegalStateException("Only store staff can view overview");
+        }
+
+        String storeId = store.getId();
+
+        long totalOrders = orderRepository.countByStore_Id(storeId);
+        long pendingOrders = orderRepository.countByStore_IdAndStatus(storeId, OrderStatus.PENDING);
+        long inProgressOrders = orderRepository.countByStore_IdAndStatus(storeId, OrderStatus.IN_PROGRESS);
+        long shippingOrders = orderRepository.countByStore_IdAndStatus(storeId, OrderStatus.SHIPPING);
+        long deliveredOrders = orderRepository.countByStore_IdAndStatus(storeId, OrderStatus.DELIVERED);
+        long cancelledOrders = orderRepository.countByStore_IdAndStatus(storeId, OrderStatus.CANCELLED);
+        long lowStockItems = storeInventoryRepository.countLowStockItemsByStoreId(storeId);
+        long activeDeliveries = deliveryRepository.countByOrder_Store_IdAndStatusIn(storeId, Arrays.asList("ASSIGNED", "SHIPPING"));
+
+        return StoreOverviewResponse.builder()
+                .storeId(storeId)
+                .storeName(store.getName())
+                .totalOrders(totalOrders)
+                .pendingOrders(pendingOrders)
+                .inProgressOrders(inProgressOrders)
+                .shippingOrders(shippingOrders)
+                .deliveredOrders(deliveredOrders)
+                .cancelledOrders(cancelledOrders)
+                .lowStockItems(lowStockItems)
+                .activeDeliveries(activeDeliveries)
+                .build();
+    }
+
+    @Override
+    public List<String> getOrderStatuses() {
+        return Arrays.stream(OrderStatus.values())
+                .map(Enum::name)
+                .collect(Collectors.toList());
     }
 
     @Override

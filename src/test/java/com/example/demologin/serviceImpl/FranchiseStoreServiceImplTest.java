@@ -5,9 +5,12 @@ import com.example.demologin.dto.request.store.CreateOrderRequest;
 import com.example.demologin.dto.request.store.OrderItemRequest;
 import com.example.demologin.dto.response.DeliveryResponse;
 import com.example.demologin.dto.response.OrderResponse;
+import com.example.demologin.dto.response.OrderTimelineResponse;
 import com.example.demologin.dto.response.StoreInventoryResponse;
+import com.example.demologin.dto.response.StoreOverviewResponse;
 import com.example.demologin.dto.response.StoreResponse;
 import com.example.demologin.entity.*;
+import com.example.demologin.enums.OrderStatus;
 import com.example.demologin.exception.exceptions.NotFoundException;
 import com.example.demologin.repository.*;
 import com.example.demologin.mapper.ProductMapper;
@@ -35,6 +38,7 @@ import java.math.BigDecimal;
 import java.security.Principal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -125,7 +129,7 @@ class FranchiseStoreServiceImplTest {
         assertNotNull(response);
         assertEquals("ST001", response.getStoreId());
         assertNull(response.getKitchenId());
-        assertEquals("PENDING", response.getStatus());
+        assertEquals(OrderStatus.PENDING, response.getStatus());
         assertEquals("NORMAL", response.getPriority()); // requestedDate is tomorrow (1 day) -> NORMAL
         assertEquals(1, response.getItems().size());
         verify(orderRepository).save(any(Order.class));
@@ -150,7 +154,7 @@ class FranchiseStoreServiceImplTest {
     void getOrders_shouldReturnPagedOrders() {
         // Arrange
         mockCurrentStore("testuser", store);
-        Order order = Order.builder().id("ORD001").store(store).kitchen(kitchen).status("PENDING").build();
+        Order order = Order.builder().id("ORD001").store(store).kitchen(kitchen).status(OrderStatus.PENDING).build();
         Page<Order> orderPage = new PageImpl<>(List.of(order));
         when(orderRepository.findByStore_Id(eq("ST001"), any(PageRequest.class))).thenReturn(orderPage);
         when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(Collections.emptyList());
@@ -165,7 +169,7 @@ class FranchiseStoreServiceImplTest {
 
     @Test
     void getOrderById_shouldReturnOrder() {
-        Order order = Order.builder().id("ORD001").store(store).kitchen(kitchen).status("PENDING").build();
+        Order order = Order.builder().id("ORD001").store(store).kitchen(kitchen).status(OrderStatus.PENDING).build();
         when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
 
         OrderResponse response = franchiseStoreService.getOrderById("ORD001");
@@ -174,23 +178,9 @@ class FranchiseStoreServiceImplTest {
     }
 
     @Test
-    void getDeliveryByOrderId_shouldReturnDelivery() {
-        Order order = Order.builder().id("ORD001").build();
-        Delivery delivery = Delivery.builder().id("DEL001").order(order).status("SHIPPING").build();
-        
-        when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
-        when(deliveryRepository.findByOrder_Id("ORD001")).thenReturn(Optional.of(delivery));
-
-        DeliveryResponse response = franchiseStoreService.getDeliveryByOrderId("ORD001");
-
-        assertEquals("DEL001", response.getId());
-        assertEquals("SHIPPING", response.getStatus());
-    }
-
-    @Test
     void confirmReceipt_shouldUpdateDeliveryAndOrderStatus() {
         // Arrange
-        Order order = Order.builder().id("ORD001").status("SHIPPING").build();
+        Order order = Order.builder().id("ORD001").status(OrderStatus.SHIPPING).build();
         Delivery delivery = Delivery.builder().id("DEL001").order(order).status("SHIPPING").build();
         
         ConfirmReceiptRequest request = mock(ConfirmReceiptRequest.class);
@@ -205,7 +195,7 @@ class FranchiseStoreServiceImplTest {
 
         // Assert
         assertEquals("DELIVERED", response.getStatus());
-        assertEquals("DELIVERED", order.getStatus());
+        assertEquals(OrderStatus.DELIVERED, order.getStatus());
         verify(orderRepository).save(order);
     }
 
@@ -246,10 +236,10 @@ class FranchiseStoreServiceImplTest {
     @Test
     void getOrders_shouldReturnPagedOrdersWithStatus() {
         mockCurrentStore("testuser", store);
-        Order order = Order.builder().id("ORD001").store(store).kitchen(kitchen).status("PENDING").build();
+        Order order = Order.builder().id("ORD001").store(store).kitchen(kitchen).status(OrderStatus.PENDING).build();
         Page<Order> orderPage = new PageImpl<>(List.of(order));
         
-        when(orderRepository.findByStore_IdAndStatus(eq("ST001"), eq("PENDING"), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderRepository.findByStore_IdAndStatus(eq("ST001"), eq(OrderStatus.PENDING), any(PageRequest.class))).thenReturn(orderPage);
         when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(Collections.emptyList());
 
         Page<OrderResponse> result = franchiseStoreService.getOrders("pending", principal, 0, 10);
@@ -258,7 +248,7 @@ class FranchiseStoreServiceImplTest {
 
     @Test
     void confirmReceipt_shouldUpdateDeliveryWithNotes() {
-        Order order = Order.builder().id("ORD001").status("SHIPPING").build();
+        Order order = Order.builder().id("ORD001").status(OrderStatus.SHIPPING).build();
         Delivery delivery = Delivery.builder().id("DEL001").order(order).status("SHIPPING").build();
         
         ConfirmReceiptRequest request = mock(ConfirmReceiptRequest.class);
@@ -380,7 +370,7 @@ class FranchiseStoreServiceImplTest {
     @Test
     void getOrders_shouldReturnAllOrdersWhenStatusIsBlank() {
         mockCurrentStore("testuser", store);
-        Order order = Order.builder().id("ORD001").store(store).kitchen(kitchen).status("PENDING").build();
+        Order order = Order.builder().id("ORD001").store(store).kitchen(kitchen).status(OrderStatus.PENDING).build();
         Page<Order> orderPage = new PageImpl<>(List.of(order));
         
         when(orderRepository.findByStore_Id(eq("ST001"), any(PageRequest.class))).thenReturn(orderPage);
@@ -397,17 +387,41 @@ class FranchiseStoreServiceImplTest {
     }
 
     @Test
-    void getDeliveryByOrderId_shouldThrowExceptionWhenOrderNotFound() {
-        when(orderRepository.findById("ORD001")).thenReturn(Optional.empty());
-        assertThrows(NotFoundException.class, () -> franchiseStoreService.getDeliveryByOrderId("ORD001"));
+    void getOrderTimeline_shouldReturnTimelineWhenOrderBelongsToCurrentStore() {
+        mockCurrentStore("testuser", store);
+        Order order = Order.builder()
+                .id("ORD001")
+                .store(store)
+                .status(OrderStatus.IN_PROGRESS)
+                .assignedAt(LocalDateTime.now().minusHours(2))
+                .inProgressAt(LocalDateTime.now().minusHours(1))
+                .build();
+        when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
+
+        OrderTimelineResponse response = franchiseStoreService.getOrderTimeline("ORD001", principal);
+
+        assertEquals("ORD001", response.getOrderId());
+        assertEquals(OrderStatus.IN_PROGRESS, response.getCurrentStatus());
+        assertNotNull(response.getAssignedAt());
+        assertNotNull(response.getInProgressAt());
     }
 
     @Test
-    void getDeliveryByOrderId_shouldThrowExceptionWhenDeliveryNotFound() {
-        Order order = Order.builder().id("ORD001").store(store).build();
+    void getOrderTimeline_shouldThrowWhenOrderNotBelongToCurrentStore() {
+        mockCurrentStore("testuser", store);
+        Store anotherStore = Store.builder().id("ST999").name("Another").build();
+        Order order = Order.builder().id("ORD001").store(anotherStore).status(OrderStatus.PENDING).build();
         when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
-        when(deliveryRepository.findByOrder_Id("ORD001")).thenReturn(Optional.empty());
-        assertThrows(NotFoundException.class, () -> franchiseStoreService.getDeliveryByOrderId("ORD001"));
+
+        assertThrows(NotFoundException.class, () -> franchiseStoreService.getOrderTimeline("ORD001", principal));
+    }
+
+    @Test
+    void getOrderTimeline_shouldThrowWhenOrderNotFound() {
+        mockCurrentStore("testuser", store);
+        when(orderRepository.findById("ORD404")).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> franchiseStoreService.getOrderTimeline("ORD404", principal));
     }
 
     @Test
@@ -486,5 +500,53 @@ class FranchiseStoreServiceImplTest {
         // Assert
         assertEquals(2, result.getTotalElements());
         verify(productRepository).searchProducts(eq("Product"), any(), any(PageRequest.class));
+    }
+
+    @Test
+    void getDeliveries_shouldReturnPagedDeliveriesWithStatusFilter() {
+        mockCurrentStore("testuser", store);
+        Order order = Order.builder().id("ORD001").store(store).build();
+        Delivery delivery = Delivery.builder().id("DEL001").order(order).status("SHIPPING").build();
+        Page<Delivery> deliveryPage = new PageImpl<>(List.of(delivery));
+
+        when(deliveryRepository.findByOrder_Store_IdAndStatus(eq("ST001"), eq("SHIPPING"), any(PageRequest.class)))
+                .thenReturn(deliveryPage);
+
+        Page<DeliveryResponse> result = franchiseStoreService.getDeliveries("shipping", principal, 0, 10);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals("DEL001", result.getContent().get(0).getId());
+        verify(deliveryRepository).findByOrder_Store_IdAndStatus(eq("ST001"), eq("SHIPPING"), any(PageRequest.class));
+    }
+
+    @Test
+    void getOverview_shouldReturnStoreOverviewMetrics() {
+        mockCurrentStore("testuser", store);
+
+        when(orderRepository.countByStore_Id("ST001")).thenReturn(12L);
+        when(orderRepository.countByStore_IdAndStatus("ST001", OrderStatus.PENDING)).thenReturn(2L);
+        when(orderRepository.countByStore_IdAndStatus("ST001", OrderStatus.IN_PROGRESS)).thenReturn(3L);
+        when(orderRepository.countByStore_IdAndStatus("ST001", OrderStatus.SHIPPING)).thenReturn(2L);
+        when(orderRepository.countByStore_IdAndStatus("ST001", OrderStatus.DELIVERED)).thenReturn(4L);
+        when(orderRepository.countByStore_IdAndStatus("ST001", OrderStatus.CANCELLED)).thenReturn(1L);
+        when(storeInventoryRepository.countLowStockItemsByStoreId("ST001")).thenReturn(5L);
+        when(deliveryRepository.countByOrder_Store_IdAndStatusIn(eq("ST001"), anyCollection())).thenReturn(2L);
+
+        StoreOverviewResponse overview = franchiseStoreService.getOverview(principal);
+
+        assertEquals("ST001", overview.getStoreId());
+        assertEquals(12L, overview.getTotalOrders());
+        assertEquals(5L, overview.getLowStockItems());
+        assertEquals(2L, overview.getActiveDeliveries());
+
+        verify(deliveryRepository).countByOrder_Store_IdAndStatusIn("ST001", Arrays.asList("ASSIGNED", "SHIPPING"));
+    }
+
+    @Test
+    void getOrderStatuses_shouldReturnAllEnumStatuses() {
+        List<String> statuses = franchiseStoreService.getOrderStatuses();
+        assertEquals(OrderStatus.values().length, statuses.size());
+        assertTrue(statuses.contains("PENDING"));
+        assertTrue(statuses.contains("DELIVERED"));
     }
 }

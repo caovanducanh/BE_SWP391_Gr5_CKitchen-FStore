@@ -144,66 +144,66 @@ public class CentralKitchenController {
         return centralKitchenService.getInventory(ingredientId, ingredientName, page, size, principal);
     }
 
-        @GetMapping("/my-kitchen")
-        @ApiResponse(message = "Kitchen retrieved successfully")
-        @SecuredEndpoint("KITCHEN_INVENTORY_VIEW")
-        @Operation(
-                        summary = "Thông tin bếp được phân công",
-                        description = "Kitchen staff xem thông tin bếp trung tâm đang phụ trách."
-        )
-        public Object getMyKitchen(Principal principal) {
-                return centralKitchenService.getMyKitchen(principal);
-        }
+    @GetMapping("/my-kitchen")
+    @ApiResponse(message = "Kitchen retrieved successfully")
+    @SecuredEndpoint("KITCHEN_INVENTORY_VIEW")
+    @Operation(
+            summary = "Thông tin bếp được phân công",
+            description = "Kitchen staff xem thông tin bếp trung tâm đang phụ trách."
+    )
+    public Object getMyKitchen(Principal principal) {
+        return centralKitchenService.getMyKitchen(principal);
+    }
 
-        @GetMapping("/order-statuses")
-        @ApiResponse(message = "Order statuses retrieved successfully")
-        @SecuredEndpoint("ORDER_STATUS_UPDATE")
-        @Operation(
-                        summary = "Danh sách trạng thái đơn hàng",
-                        description = "Trả về danh sách trạng thái cho UI của kitchen staff khi cập nhật đơn hàng."
-        )
-        public Object getOrderStatuses(Principal principal) {
-                return centralKitchenService.getOrderStatuses(principal);
-        }
+    @GetMapping("/order-statuses")
+    @ApiResponse(message = "Order statuses retrieved successfully")
+    @SecuredEndpoint("ORDER_STATUS_UPDATE")
+    @Operation(
+            summary = "Danh sách trạng thái đơn hàng",
+            description = "Trả về danh sách trạng thái cho UI của kitchen staff khi cập nhật đơn hàng."
+    )
+    public Object getOrderStatuses(Principal principal) {
+        return centralKitchenService.getOrderStatuses(principal);
+    }
 
-        @GetMapping("/overview")
-        @ApiResponse(message = "Central kitchen overview retrieved successfully")
-        @SecuredEndpoint("ORDER_VIEW")
-        @Operation(
-                        summary = "Tổng quan vận hành bếp",
-                    description = "Số liệu nhanh cho kitchen staff: đơn chờ nhận, đang làm, chờ shipper và quá hạn. " +
-                            "Có thể lọc theo requestedDate từ fromDate đến toDate."
-        )
-            public Object getOverview(
-                    @Parameter(description = "Filter từ ngày requestedDate (yyyy-MM-dd)", example = "2026-04-01")
-                    @RequestParam(required = false) LocalDate fromDate,
-                    @Parameter(description = "Filter đến ngày requestedDate (yyyy-MM-dd)", example = "2026-04-30")
-                    @RequestParam(required = false) LocalDate toDate,
-                    Principal principal
-            ) {
-                return centralKitchenService.getOverview(fromDate, toDate, principal);
-        }
+    @GetMapping("/overview")
+    @ApiResponse(message = "Central kitchen overview retrieved successfully")
+    @SecuredEndpoint("ORDER_VIEW")
+    @Operation(
+            summary = "Tổng quan vận hành bếp",
+            description = "Số liệu nhanh cho kitchen staff: đơn chờ nhận, đang làm, chờ shipper và quá hạn. " +
+                    "Có thể lọc theo requestedDate từ fromDate đến toDate."
+    )
+    public Object getOverview(
+            @Parameter(description = "Filter từ ngày requestedDate (yyyy-MM-dd)", example = "2026-04-01")
+            @RequestParam(required = false) LocalDate fromDate,
+            @Parameter(description = "Filter đến ngày requestedDate (yyyy-MM-dd)", example = "2026-04-30")
+            @RequestParam(required = false) LocalDate toDate,
+            Principal principal
+    ) {
+        return centralKitchenService.getOverview(fromDate, toDate, principal);
+    }
 
-        @GetMapping("/stores")
-        @PageResponse
-        @ApiResponse(message = "Stores retrieved successfully")
-        @SecuredEndpoint("STORE_VIEW")
-        @Operation(
-                        summary = "Danh sách cửa hàng",
-                    description = "Kitchen staff xem danh sách các cửa hàng franchise để theo dõi điều phối đơn hàng. " +
-                            "Hỗ trợ lọc theo tên và trạng thái cửa hàng."
-        )
-        public Object getStores(
-                    @Parameter(description = "Filter theo tên cửa hàng (contains, ignore case)", example = "District")
-                    @RequestParam(required = false) String name,
-                    @Parameter(description = "Filter theo trạng thái cửa hàng", example = "ACTIVE")
-                    @RequestParam(required = false) String status,
-                        @Parameter(description = "Page index (0-based)", example = "0")
-                        @RequestParam(defaultValue = "0") int page,
-                        @Parameter(description = "Page size", example = "20")
-                        @RequestParam(defaultValue = "20") int size,
-                        Principal principal
-        ) {
-                return centralKitchenService.getStores(name, status, page, size, principal);
-        }
+    @GetMapping("/stores")
+    @PageResponse
+    @ApiResponse(message = "Stores retrieved successfully")
+    @SecuredEndpoint("STORE_VIEW")
+    @Operation(
+            summary = "Danh sách cửa hàng",
+            description = "Kitchen staff xem danh sách các cửa hàng franchise để theo dõi điều phối đơn hàng. " +
+                    "Hỗ trợ lọc theo tên và trạng thái cửa hàng."
+    )
+    public Object getStores(
+            @Parameter(description = "Filter theo tên cửa hàng (contains, ignore case)", example = "District")
+            @RequestParam(required = false) String name,
+            @Parameter(description = "Filter theo trạng thái cửa hàng", example = "ACTIVE")
+            @RequestParam(required = false) String status,
+            @Parameter(description = "Page index (0-based)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "20")
+            @RequestParam(defaultValue = "20") int size,
+            Principal principal
+    ) {
+        return centralKitchenService.getStores(name, status, page, size, principal);
+    }
 }

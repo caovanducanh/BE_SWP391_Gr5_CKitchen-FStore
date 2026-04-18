@@ -64,5 +64,17 @@ public class Order {
     @Column(precision = 15, scale = 2)
     private BigDecimal total;
 
+    private LocalDateTime assignedAt;
+
+    private LocalDateTime inProgressAt;
+
+    private LocalDateTime packedWaitingShipperAt;
+
+    private LocalDateTime shippingAt;
+
+    private LocalDateTime deliveredAt;
+
+    private LocalDateTime cancelledAt;
+
     private LocalDateTime updatedAt;
 }

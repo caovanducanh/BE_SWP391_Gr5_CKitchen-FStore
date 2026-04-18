@@ -68,6 +68,17 @@ public class FranchiseStoreController {
         return franchiseStoreService.getOrderById(orderId);
     }
 
+        @GetMapping("/orders/{orderId}/timeline")
+        @ApiResponse(message = "Order timeline retrieved successfully")
+        @SecuredEndpoint("ORDER_VIEW")
+        @Operation(
+                        summary = "Timeline trạng thái đơn hàng",
+                        description = "Xem chi tiết mốc thời gian đơn hàng: được assign lúc nào, đang làm lúc nào, đóng gói lúc nào, shipping lúc nào."
+        )
+        public Object getOrderTimeline(@PathVariable String orderId, Principal principal) {
+                return franchiseStoreService.getOrderTimeline(orderId, principal);
+        }
+
     // ==================== Delivery Tracking ====================
 
     @GetMapping("/orders/{orderId}/delivery")

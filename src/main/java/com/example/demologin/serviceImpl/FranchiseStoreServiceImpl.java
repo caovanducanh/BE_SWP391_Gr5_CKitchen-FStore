@@ -7,6 +7,7 @@ import com.example.demologin.dto.response.DeliveryResponse;
 import com.example.demologin.dto.response.ProductResponse;
 import com.example.demologin.dto.response.OrderItemResponse;
 import com.example.demologin.dto.response.OrderResponse;
+import com.example.demologin.dto.response.OrderTimelineResponse;
 import com.example.demologin.dto.response.StoreInventoryResponse;
 import com.example.demologin.entity.Delivery;
 import com.example.demologin.entity.Kitchen;
@@ -146,6 +147,34 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
     }
 
     @Override
+    public OrderTimelineResponse getOrderTimeline(String orderId, Principal principal) {
+        Store currentStore = getCurrentStore(principal);
+        if (currentStore == null) {
+            throw new IllegalStateException("Only store staff can view order timeline");
+        }
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
+
+        if (order.getStore() == null || !currentStore.getId().equals(order.getStore().getId())) {
+            throw new NotFoundException("Order not found in current store: " + orderId);
+        }
+
+        return OrderTimelineResponse.builder()
+                .orderId(order.getId())
+                .currentStatus(order.getStatus())
+                .createdAt(order.getCreatedAt())
+                .assignedAt(order.getAssignedAt())
+                .inProgressAt(order.getInProgressAt())
+                .packedWaitingShipperAt(order.getPackedWaitingShipperAt())
+                .shippingAt(order.getShippingAt())
+                .deliveredAt(order.getDeliveredAt())
+                .cancelledAt(order.getCancelledAt())
+                .updatedAt(order.getUpdatedAt())
+                .build();
+    }
+
+    @Override
     public DeliveryResponse getDeliveryByOrderId(String orderId) {
         orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
@@ -172,6 +201,9 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
         // Update associated order status
         Order order = delivery.getOrder();
         order.setStatus(OrderStatus.DELIVERED);
+        if (order.getDeliveredAt() == null) {
+            order.setDeliveredAt(LocalDateTime.now());
+        }
         order.setUpdatedAt(LocalDateTime.now());
         orderRepository.save(order);
 

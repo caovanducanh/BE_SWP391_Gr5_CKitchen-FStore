@@ -154,6 +154,9 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
 
         order.setKitchen(kitchen);
         order.setStatus(OrderStatus.ASSIGNED);
+        if (order.getAssignedAt() == null) {
+            order.setAssignedAt(LocalDateTime.now());
+        }
         order.setUpdatedAt(LocalDateTime.now());
 
         Order saved = orderRepository.save(order);
@@ -184,6 +187,7 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
                 );
             }
             order.setStatus(newStatus);
+            markOrderStatusTimestamp(order, newStatus);
         }
 
         String normalizedNotes = normalizeText(request.getNotes());
@@ -439,6 +443,43 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
             return line;
         }
         return oldNotes + "\n" + line;
+    }
+
+    private void markOrderStatusTimestamp(Order order, OrderStatus status) {
+        LocalDateTime now = LocalDateTime.now();
+        switch (status) {
+            case ASSIGNED -> {
+                if (order.getAssignedAt() == null) order.setAssignedAt(now);
+            }
+            case IN_PROGRESS, PROCESSING -> {
+                if (order.getAssignedAt() == null) order.setAssignedAt(now);
+                if (order.getInProgressAt() == null) order.setInProgressAt(now);
+            }
+            case PACKED_WAITING_SHIPPER -> {
+                if (order.getAssignedAt() == null) order.setAssignedAt(now);
+                if (order.getInProgressAt() == null) order.setInProgressAt(now);
+                if (order.getPackedWaitingShipperAt() == null) order.setPackedWaitingShipperAt(now);
+            }
+            case SHIPPING -> {
+                if (order.getAssignedAt() == null) order.setAssignedAt(now);
+                if (order.getInProgressAt() == null) order.setInProgressAt(now);
+                if (order.getPackedWaitingShipperAt() == null) order.setPackedWaitingShipperAt(now);
+                if (order.getShippingAt() == null) order.setShippingAt(now);
+            }
+            case DELIVERED -> {
+                if (order.getAssignedAt() == null) order.setAssignedAt(now);
+                if (order.getInProgressAt() == null) order.setInProgressAt(now);
+                if (order.getPackedWaitingShipperAt() == null) order.setPackedWaitingShipperAt(now);
+                if (order.getShippingAt() == null) order.setShippingAt(now);
+                if (order.getDeliveredAt() == null) order.setDeliveredAt(now);
+            }
+            case CANCELLED -> {
+                if (order.getCancelledAt() == null) order.setCancelledAt(now);
+            }
+            default -> {
+                // do nothing
+            }
+        }
     }
 
     private String generateProductionPlanId() {

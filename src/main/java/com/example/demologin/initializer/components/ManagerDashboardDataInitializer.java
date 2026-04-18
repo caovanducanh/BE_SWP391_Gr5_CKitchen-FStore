@@ -14,6 +14,7 @@ import com.example.demologin.entity.SalesRecord;
 import com.example.demologin.entity.Store;
 import com.example.demologin.entity.StoreInventory;
 import com.example.demologin.entity.User;
+import com.example.demologin.enums.OrderStatus;
 import com.example.demologin.repository.BatchRepository;
 import com.example.demologin.repository.DeliveryRepository;
 import com.example.demologin.repository.IngredientRepository;
@@ -66,6 +67,7 @@ public class ManagerDashboardDataInitializer {
 
         ensurePriorityConfigs();
         Kitchen kitchen = ensureKitchen();
+        ensureKitchenStaffAssignment(kitchen);
         Store store = ensureStore();
 
         Product product1 = productRepository.findById("PROD001")
@@ -91,32 +93,32 @@ public class ManagerDashboardDataInitializer {
 
         // ===== ORDERS =====
         Order order1 = ensureOrder(
-                "ORD001", store, kitchen, "PENDING", "HIGH",
+                "ORD001", store, kitchen, OrderStatus.PENDING, "HIGH",
                 LocalDateTime.now().minusHours(4), LocalDate.now().plusDays(1),
                 "Cần bổ sung gấp ngượi liệu", "storestaff", new BigDecimal("650000")
         );
         Order order2 = ensureOrder(
-                "ORD002", store, kitchen, "PROCESSING", "NORMAL",
+                "ORD002", store, kitchen, OrderStatus.IN_PROGRESS, "NORMAL",
                 LocalDateTime.now().minusHours(8), LocalDate.now().plusDays(2),
                 "Nhập hàng tuần", "storestaff", new BigDecimal("430000")
         );
         Order order3 = ensureOrder(
-                "ORD003", store, kitchen, "APPROVED", "NORMAL",
+                "ORD003", store, kitchen, OrderStatus.ASSIGNED, "NORMAL",
                 LocalDateTime.now().minusDays(1), LocalDate.now().plusDays(3),
                 "Sự kiện cuối tuần", "storestaff", new BigDecimal("520000")
         );
         Order order4 = ensureOrder(
-                "ORD004", store, kitchen, "SHIPPING", "HIGH",
+                "ORD004", store, kitchen, OrderStatus.SHIPPING, "HIGH",
                 LocalDateTime.now().minusDays(2), LocalDate.now(),
                 "Giao hôm nay", "storestaff", new BigDecimal("310000")
         );
         Order order5 = ensureOrder(
-                "ORD005", store, kitchen, "DELIVERED", "NORMAL",
+                "ORD005", store, kitchen, OrderStatus.DELIVERED, "NORMAL",
                 LocalDateTime.now().minusDays(3), LocalDate.now().minusDays(1),
                 "Đã nhận 28/03", "storestaff", new BigDecimal("290000")
         );
         Order order6 = ensureOrder(
-                "ORD006", store, kitchen, "CANCELLED", "LOW",
+                "ORD006", store, kitchen, OrderStatus.CANCELLED, "LOW",
                 LocalDateTime.now().minusDays(4), LocalDate.now().minusDays(2),
                 "Hủy do hết sản phẩm", "storestaff", new BigDecimal("0")
         );
@@ -194,6 +196,21 @@ public class ManagerDashboardDataInitializer {
                 .build()));
     }
 
+        private void ensureKitchenStaffAssignment(Kitchen kitchen) {
+                boolean changed = false;
+                List<User> kitchenStaffUsers = userRepository.findAllByRole_Name("CENTRAL_KITCHEN_STAFF");
+                for (User staff : kitchenStaffUsers) {
+                        if (staff.getKitchen() == null) {
+                                staff.setKitchen(kitchen);
+                                changed = true;
+                        }
+                }
+                if (changed) {
+                        userRepository.saveAll(kitchenStaffUsers);
+                        log.info("✅ Assigned kitchen {} to {} central kitchen staff user(s)", kitchen.getId(), kitchenStaffUsers.size());
+                }
+        }
+
     private ProductionPlan ensureProductionPlan(String id,
                                                 Product product,
                                                 Integer quantity,
@@ -221,7 +238,7 @@ public class ManagerDashboardDataInitializer {
     private Order ensureOrder(String id,
                               Store store,
                               Kitchen kitchen,
-                              String status,
+                              OrderStatus status,
                               String priority,
                               LocalDateTime createdAt,
                               LocalDate requestedDate,

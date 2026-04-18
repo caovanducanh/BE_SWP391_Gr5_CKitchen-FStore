@@ -54,6 +54,10 @@ public class User implements UserDetails {
     @JoinColumn(name = "store_id")
     private Store store;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "kitchen_id")
+    private Kitchen kitchen;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private UserStatus status;
@@ -190,6 +194,14 @@ public class User implements UserDetails {
 
     public void setStore(Store store) {
         this.store = store;
+    }
+
+    public Kitchen getKitchen() {
+        return kitchen;
+    }
+
+    public void setKitchen(Kitchen kitchen) {
+        this.kitchen = kitchen;
     }
     
     public UserStatus getStatus() {

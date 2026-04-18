@@ -46,7 +46,7 @@ public class FranchiseStoreController {
             description = "Xem danh sách đơn đặt hàng của cửa hàng. Lọc theo status."
     )
     public Object getOrders(
-            @Parameter(description = "Order status filter (PENDING, PROCESSING, APPROVED, SHIPPING, DELIVERED, CANCELLED)", example = "PENDING")
+            @Parameter(description = "Order status filter (PENDING, ASSIGNED, IN_PROGRESS, PACKED_WAITING_SHIPPER, SHIPPING, DELIVERED, CANCELLED)", example = "PENDING")
             @RequestParam(required = false) String status,
             @Parameter(description = "Page index (0-based)", example = "0")
             @RequestParam(defaultValue = "0") int page,

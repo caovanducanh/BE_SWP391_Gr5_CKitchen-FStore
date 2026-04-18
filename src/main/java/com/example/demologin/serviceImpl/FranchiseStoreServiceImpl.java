@@ -18,6 +18,7 @@ import com.example.demologin.entity.Store;
 import com.example.demologin.entity.StoreInventory;
 import com.example.demologin.dto.response.StoreResponse;
 import com.example.demologin.entity.User;
+import com.example.demologin.enums.OrderStatus;
 import com.example.demologin.enums.ProductCategory;
 import com.example.demologin.exception.exceptions.NotFoundException;
 import com.example.demologin.exception.exceptions.BadRequestException;
@@ -91,7 +92,7 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
         Order order = Order.builder()
                 .id(orderId)
                 .store(store)
-                .status("PENDING")
+            .status(OrderStatus.PENDING)
                 .priority(priority)
                 .createdAt(LocalDateTime.now())
                 .requestedDate(request.getRequestedDate())
@@ -125,7 +126,7 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
 
         Page<Order> orders;
         if (hasStatus) {
-            orders = orderRepository.findByStore_IdAndStatus(finalStoreId, status.toUpperCase(), pageRequest);
+            orders = orderRepository.findByStore_IdAndStatus(finalStoreId, parseOrderStatus(status), pageRequest);
         } else {
             orders = orderRepository.findByStore_Id(finalStoreId, pageRequest);
         }
@@ -170,7 +171,7 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
 
         // Update associated order status
         Order order = delivery.getOrder();
-        order.setStatus("DELIVERED");
+        order.setStatus(OrderStatus.DELIVERED);
         order.setUpdatedAt(LocalDateTime.now());
         orderRepository.save(order);
 
@@ -246,6 +247,14 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
                 .map(OrderPriorityConfig::getPriorityCode)
                 .findFirst()
                 .orElse("NORMAL");
+    }
+
+    private OrderStatus parseOrderStatus(String status) {
+        try {
+            return OrderStatus.valueOf(status.trim().toUpperCase());
+        } catch (Exception ex) {
+            throw new BadRequestException("Invalid order status: " + status);
+        }
     }
 
     private OrderItem buildOrderItem(OrderItemRequest req, Order order) {

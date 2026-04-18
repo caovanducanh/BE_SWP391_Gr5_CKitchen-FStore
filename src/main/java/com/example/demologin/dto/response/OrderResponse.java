@@ -1,5 +1,7 @@
 package com.example.demologin.dto.response;
 
+import com.example.demologin.enums.OrderStatus;
+
 import lombok.Builder;
 import lombok.Getter;
 
@@ -16,7 +18,7 @@ public class OrderResponse {
     private String storeName;
     private String kitchenId;
     private String kitchenName;
-    private String status;
+    private OrderStatus status;
     private String priority;
     private LocalDateTime createdAt;
     private LocalDate requestedDate;

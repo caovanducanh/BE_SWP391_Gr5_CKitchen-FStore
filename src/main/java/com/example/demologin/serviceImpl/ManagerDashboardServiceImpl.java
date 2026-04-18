@@ -3,6 +3,7 @@ package com.example.demologin.serviceImpl;
 import com.example.demologin.dto.response.KitchenLowStockResponse;
 import com.example.demologin.dto.response.ManagerOverviewResponse;
 import com.example.demologin.dto.response.StoreLowStockResponse;
+import com.example.demologin.enums.OrderStatus;
 import com.example.demologin.entity.KitchenInventory;
 import com.example.demologin.entity.StoreInventory;
 import com.example.demologin.repository.*;
@@ -36,7 +37,15 @@ public class ManagerDashboardServiceImpl implements ManagerDashboardService {
                 .totalRecipes(recipeRepository.count())
                 .activeProductionPlans(productionPlanRepository.countByStatusIn(List.of("PLANNED", "IN_PROGRESS")))
                 .inProgressBatches(batchRepository.countByStatusIn(List.of("IN_PROGRESS")))
-                .pendingOrders(orderRepository.countByStatusIn(List.of("PENDING", "APPROVED", "PROCESSING")))
+                .pendingOrders(orderRepository.countByStatusIn(List.of(
+                    OrderStatus.PENDING,
+                    OrderStatus.ASSIGNED,
+                    OrderStatus.IN_PROGRESS,
+                    OrderStatus.PACKED_WAITING_SHIPPER,
+                    OrderStatus.SHIPPING,
+                    OrderStatus.APPROVED,
+                    OrderStatus.PROCESSING
+                )))
                 .lowStockKitchenItems(kitchenInventoryRepository.countLowStockItems())
                 .lowStockStoreItems(storeInventoryRepository.countLowStockItems())
                 .totalRevenue(nonNullBigDecimal(salesRecordRepository.sumTotalRevenue()))

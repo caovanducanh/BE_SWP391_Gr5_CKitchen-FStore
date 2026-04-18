@@ -1,7 +1,11 @@
 package com.example.demologin.entity;
 
+import com.example.demologin.enums.OrderStatus;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -38,8 +42,9 @@ public class Order {
     @JoinColumn(name = "kitchen_id", nullable = true)
     private Kitchen kitchen;
 
-    @Column(nullable = false, length = 20)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private OrderStatus status;
 
     @Column(nullable = false, length = 10)
     private String priority;
@@ -58,6 +63,18 @@ public class Order {
 
     @Column(precision = 15, scale = 2)
     private BigDecimal total;
+
+    private LocalDateTime assignedAt;
+
+    private LocalDateTime inProgressAt;
+
+    private LocalDateTime packedWaitingShipperAt;
+
+    private LocalDateTime shippingAt;
+
+    private LocalDateTime deliveredAt;
+
+    private LocalDateTime cancelledAt;
 
     private LocalDateTime updatedAt;
 }

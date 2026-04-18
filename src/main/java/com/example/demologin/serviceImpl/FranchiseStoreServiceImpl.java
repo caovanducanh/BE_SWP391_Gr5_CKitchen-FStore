@@ -7,7 +7,9 @@ import com.example.demologin.dto.response.DeliveryResponse;
 import com.example.demologin.dto.response.ProductResponse;
 import com.example.demologin.dto.response.OrderItemResponse;
 import com.example.demologin.dto.response.OrderResponse;
+import com.example.demologin.dto.response.OrderTimelineResponse;
 import com.example.demologin.dto.response.StoreInventoryResponse;
+import com.example.demologin.dto.response.StoreOverviewResponse;
 import com.example.demologin.entity.Delivery;
 import com.example.demologin.entity.Kitchen;
 import com.example.demologin.entity.Order;
@@ -18,6 +20,7 @@ import com.example.demologin.entity.Store;
 import com.example.demologin.entity.StoreInventory;
 import com.example.demologin.dto.response.StoreResponse;
 import com.example.demologin.entity.User;
+import com.example.demologin.enums.OrderStatus;
 import com.example.demologin.enums.ProductCategory;
 import com.example.demologin.exception.exceptions.NotFoundException;
 import com.example.demologin.exception.exceptions.BadRequestException;
@@ -48,6 +51,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Collections;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -91,7 +95,7 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
         Order order = Order.builder()
                 .id(orderId)
                 .store(store)
-                .status("PENDING")
+            .status(OrderStatus.PENDING)
                 .priority(priority)
                 .createdAt(LocalDateTime.now())
                 .requestedDate(request.getRequestedDate())
@@ -125,7 +129,7 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
 
         Page<Order> orders;
         if (hasStatus) {
-            orders = orderRepository.findByStore_IdAndStatus(finalStoreId, status.toUpperCase(), pageRequest);
+            orders = orderRepository.findByStore_IdAndStatus(finalStoreId, parseOrderStatus(status), pageRequest);
         } else {
             orders = orderRepository.findByStore_Id(finalStoreId, pageRequest);
         }
@@ -145,12 +149,50 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
     }
 
     @Override
-    public DeliveryResponse getDeliveryByOrderId(String orderId) {
-        orderRepository.findById(orderId)
+    public OrderTimelineResponse getOrderTimeline(String orderId, Principal principal) {
+        Store currentStore = getCurrentStore(principal);
+        if (currentStore == null) {
+            throw new IllegalStateException("Only store staff can view order timeline");
+        }
+
+        Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
-        Delivery delivery = deliveryRepository.findByOrder_Id(orderId)
-                .orElseThrow(() -> new NotFoundException("No delivery found for order: " + orderId));
-        return toDeliveryResponse(delivery);
+
+        if (order.getStore() == null || !currentStore.getId().equals(order.getStore().getId())) {
+            throw new NotFoundException("Order not found in current store: " + orderId);
+        }
+
+        return OrderTimelineResponse.builder()
+                .orderId(order.getId())
+                .currentStatus(order.getStatus())
+                .createdAt(order.getCreatedAt())
+                .assignedAt(order.getAssignedAt())
+                .inProgressAt(order.getInProgressAt())
+                .packedWaitingShipperAt(order.getPackedWaitingShipperAt())
+                .shippingAt(order.getShippingAt())
+                .deliveredAt(order.getDeliveredAt())
+                .cancelledAt(order.getCancelledAt())
+                .updatedAt(order.getUpdatedAt())
+                .build();
+    }
+
+    @Override
+    public Page<DeliveryResponse> getDeliveries(String status, Principal principal, int page, int size) {
+        Store currentStore = getCurrentStore(principal);
+        if (currentStore == null) {
+            throw new IllegalStateException("Only store staff can view deliveries");
+        }
+
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "assignedAt"));
+        Page<Delivery> deliveries;
+
+        if (status != null && !status.isBlank()) {
+            deliveries = deliveryRepository.findByOrder_Store_IdAndStatus(currentStore.getId(), status.trim().toUpperCase(), pageRequest);
+        } else {
+            deliveries = deliveryRepository.findByOrder_Store_Id(currentStore.getId(), pageRequest);
+        }
+
+        return deliveries.map(this::toDeliveryResponse);
     }
 
     @Override
@@ -170,7 +212,10 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
 
         // Update associated order status
         Order order = delivery.getOrder();
-        order.setStatus("DELIVERED");
+        order.setStatus(OrderStatus.DELIVERED);
+        if (order.getDeliveredAt() == null) {
+            order.setDeliveredAt(LocalDateTime.now());
+        }
         order.setUpdatedAt(LocalDateTime.now());
         orderRepository.save(order);
 
@@ -215,6 +260,45 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
     }
 
     @Override
+    public StoreOverviewResponse getOverview(Principal principal) {
+        Store store = getCurrentStore(principal);
+        if (store == null) {
+            throw new IllegalStateException("Only store staff can view overview");
+        }
+
+        String storeId = store.getId();
+
+        long totalOrders = orderRepository.countByStore_Id(storeId);
+        long pendingOrders = orderRepository.countByStore_IdAndStatus(storeId, OrderStatus.PENDING);
+        long inProgressOrders = orderRepository.countByStore_IdAndStatus(storeId, OrderStatus.IN_PROGRESS);
+        long shippingOrders = orderRepository.countByStore_IdAndStatus(storeId, OrderStatus.SHIPPING);
+        long deliveredOrders = orderRepository.countByStore_IdAndStatus(storeId, OrderStatus.DELIVERED);
+        long cancelledOrders = orderRepository.countByStore_IdAndStatus(storeId, OrderStatus.CANCELLED);
+        long lowStockItems = storeInventoryRepository.countLowStockItemsByStoreId(storeId);
+        long activeDeliveries = deliveryRepository.countByOrder_Store_IdAndStatusIn(storeId, Arrays.asList("ASSIGNED", "SHIPPING"));
+
+        return StoreOverviewResponse.builder()
+                .storeId(storeId)
+                .storeName(store.getName())
+                .totalOrders(totalOrders)
+                .pendingOrders(pendingOrders)
+                .inProgressOrders(inProgressOrders)
+                .shippingOrders(shippingOrders)
+                .deliveredOrders(deliveredOrders)
+                .cancelledOrders(cancelledOrders)
+                .lowStockItems(lowStockItems)
+                .activeDeliveries(activeDeliveries)
+                .build();
+    }
+
+    @Override
+    public List<String> getOrderStatuses() {
+        return Arrays.stream(OrderStatus.values())
+                .map(Enum::name)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public Page<ProductResponse> getAvailableProducts(String name, String category, int page, int size) {
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by("name"));
         
@@ -246,6 +330,14 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
                 .map(OrderPriorityConfig::getPriorityCode)
                 .findFirst()
                 .orElse("NORMAL");
+    }
+
+    private OrderStatus parseOrderStatus(String status) {
+        try {
+            return OrderStatus.valueOf(status.trim().toUpperCase());
+        } catch (Exception ex) {
+            throw new BadRequestException("Invalid order status: " + status);
+        }
     }
 
     private OrderItem buildOrderItem(OrderItemRequest req, Order order) {

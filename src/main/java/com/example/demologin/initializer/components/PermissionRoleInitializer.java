@@ -66,6 +66,13 @@ public class PermissionRoleInitializer {
     private static final String DELIVERY_CONFIRM = "DELIVERY_CONFIRM";
     private static final String STORE_INVENTORY_VIEW = "STORE_INVENTORY_VIEW";
 
+    // Central Kitchen Staff permissions
+    private static final String ORDER_ASSIGN = "ORDER_ASSIGN";
+    private static final String ORDER_STATUS_UPDATE = "ORDER_STATUS_UPDATE";
+    private static final String PRODUCTION_PLAN_VIEW = "PRODUCTION_PLAN_VIEW";
+    private static final String PRODUCTION_PLAN_CREATE = "PRODUCTION_PLAN_CREATE";
+    private static final String KITCHEN_INVENTORY_VIEW = "KITCHEN_INVENTORY_VIEW";
+
         // ===================== ROLE NAMES =====================
         private static final String ROLE_ADMIN = "ADMIN";
         private static final String ROLE_MANAGER = "MANAGER";
@@ -115,6 +122,11 @@ public class PermissionRoleInitializer {
                 ensurePermission(DELIVERY_VIEW, "Xem trạng thái giao hàng");
                 ensurePermission(DELIVERY_CONFIRM, "Xác nhận nhận hàng và phản hồi chất lượng");
                 ensurePermission(STORE_INVENTORY_VIEW, "Xem tồn kho cửa hàng franchise");
+                ensurePermission(ORDER_ASSIGN, "Tiếp nhận và gán đơn hàng cho bếp xử lý");
+                ensurePermission(ORDER_STATUS_UPDATE, "Cập nhật trạng thái đơn hàng vận hành bếp");
+                ensurePermission(PRODUCTION_PLAN_VIEW, "Xem kế hoạch sản xuất");
+                ensurePermission(PRODUCTION_PLAN_CREATE, "Tạo kế hoạch sản xuất");
+                ensurePermission(KITCHEN_INVENTORY_VIEW, "Xem tồn kho nguyên liệu bếp trung tâm");
 
         log.debug("✅ Created {} permissions", permissionRepository.count());
     }
@@ -162,7 +174,16 @@ public class PermissionRoleInitializer {
         ensureRole(ROLE_ADMIN, adminPerms);
         ensureRole(ROLE_MANAGER, managerPerms);
         ensureRole(ROLE_SUPPLY_COORDINATOR, supplyCoordinatorPerms);
-        ensureRole(ROLE_CENTRAL_KITCHEN_STAFF, operationalPerms);
+
+        Set<Permission> centralKitchenPerms = new HashSet<>(operationalPerms);
+        centralKitchenPerms.add(permMap.get(ORDER_VIEW));
+        centralKitchenPerms.add(permMap.get(ORDER_ASSIGN));
+        centralKitchenPerms.add(permMap.get(ORDER_STATUS_UPDATE));
+        centralKitchenPerms.add(permMap.get(PRODUCTION_PLAN_VIEW));
+        centralKitchenPerms.add(permMap.get(PRODUCTION_PLAN_CREATE));
+        centralKitchenPerms.add(permMap.get(KITCHEN_INVENTORY_VIEW));
+        centralKitchenPerms.add(permMap.get(STORE_VIEW));
+        ensureRole(ROLE_CENTRAL_KITCHEN_STAFF, centralKitchenPerms);
 
         // Franchise Store Staff: thêm quyền nghiệp vụ đặt hàng và tồn kho
         Set<Permission> franchiseStorePerms = new HashSet<>(operationalPerms);

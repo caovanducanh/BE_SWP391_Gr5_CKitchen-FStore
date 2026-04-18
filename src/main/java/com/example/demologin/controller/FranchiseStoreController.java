@@ -46,7 +46,7 @@ public class FranchiseStoreController {
             description = "Xem danh sách đơn đặt hàng của cửa hàng. Lọc theo status."
     )
     public Object getOrders(
-            @Parameter(description = "Order status filter (PENDING, PROCESSING, APPROVED, SHIPPING, DELIVERED, CANCELLED)", example = "PENDING")
+            @Parameter(description = "Order status filter (PENDING, ASSIGNED, IN_PROGRESS, PACKED_WAITING_SHIPPER, SHIPPING, DELIVERED, CANCELLED)", example = "PENDING")
             @RequestParam(required = false) String status,
             @Parameter(description = "Page index (0-based)", example = "0")
             @RequestParam(defaultValue = "0") int page,
@@ -68,17 +68,48 @@ public class FranchiseStoreController {
         return franchiseStoreService.getOrderById(orderId);
     }
 
+        @GetMapping("/orders/{orderId}/timeline")
+        @ApiResponse(message = "Order timeline retrieved successfully")
+        @SecuredEndpoint("ORDER_VIEW")
+        @Operation(
+                        summary = "Timeline trạng thái đơn hàng",
+                        description = "Xem chi tiết mốc thời gian đơn hàng: được assign lúc nào, đang làm lúc nào, đóng gói lúc nào, shipping lúc nào."
+        )
+        public Object getOrderTimeline(@PathVariable String orderId, Principal principal) {
+                return franchiseStoreService.getOrderTimeline(orderId, principal);
+        }
+
+        @GetMapping("/orders/statuses")
+        @ApiResponse(message = "Order statuses retrieved successfully")
+        @SecuredEndpoint("ORDER_VIEW")
+        @Operation(
+                        summary = "Danh sách trạng thái đơn hàng",
+                        description = "Lấy danh sách trạng thái chuẩn để frontend dùng cho filter/timeline badge."
+        )
+        public Object getOrderStatuses() {
+                return franchiseStoreService.getOrderStatuses();
+        }
+
     // ==================== Delivery Tracking ====================
 
-    @GetMapping("/orders/{orderId}/delivery")
-    @ApiResponse(message = "Delivery retrieved successfully")
+    @GetMapping("/deliveries")
+    @PageResponse
+    @ApiResponse(message = "Deliveries retrieved successfully")
     @SecuredEndpoint("DELIVERY_VIEW")
     @Operation(
-            summary = "Theo dõi giao hàng",
-            description = "Xem trạng thái xử lý và giao hàng của một đơn đặt hàng."
+            summary = "Danh sách giao hàng của cửa hàng",
+            description = "Xem danh sách các lượt giao hàng liên quan tới cửa hàng hiện tại. Có thể lọc theo status (ASSIGNED, SHIPPING, DELIVERED)."
     )
-    public Object getDeliveryByOrderId(@PathVariable String orderId) {
-        return franchiseStoreService.getDeliveryByOrderId(orderId);
+    public Object getDeliveries(
+            @Parameter(description = "Delivery status filter (ASSIGNED, SHIPPING, DELIVERED)", example = "SHIPPING")
+            @RequestParam(required = false) String status,
+            @Parameter(description = "Page index (0-based)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "20")
+            @RequestParam(defaultValue = "20") int size,
+            Principal principal
+    ) {
+        return franchiseStoreService.getDeliveries(status, principal, page, size);
     }
 
     // ==================== Receipt Confirmation ====================
@@ -135,6 +166,17 @@ public class FranchiseStoreController {
     public Object getMyStore(Principal principal) {
         return franchiseStoreService.getMyStore(principal);
     }
+
+        @GetMapping("/overview")
+        @ApiResponse(message = "Store overview retrieved successfully")
+        @SecuredEndpoint("STORE_VIEW")
+        @Operation(
+                        summary = "Tổng quan vận hành cửa hàng",
+                        description = "Lấy nhanh các chỉ số quản lý: số đơn theo trạng thái, tồn kho sắp hết, số lượt giao đang active."
+        )
+        public Object getOverview(Principal principal) {
+                return franchiseStoreService.getOverview(principal);
+        }
 
     // ==================== Product Catalog ====================
 

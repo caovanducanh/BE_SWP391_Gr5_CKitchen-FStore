@@ -34,7 +34,7 @@ class UserServiceTest {
 		MemberResponse memberResponse = new MemberResponse();
 		when(userRepository.findAll(any(org.springframework.data.domain.Pageable.class))).thenReturn(userPage);
 		when(userMapper.toUserResponse(user)).thenReturn(memberResponse);
-		var result = userService.getAllUsers(0, 10);
+		var result = userService.getAllUsers(null, null, 0, 10);
 		assertEquals(1, result.getTotalElements());
 		assertEquals(memberResponse, result.getContent().get(0));
 	}

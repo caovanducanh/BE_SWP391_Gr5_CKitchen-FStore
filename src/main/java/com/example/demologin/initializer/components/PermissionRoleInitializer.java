@@ -78,6 +78,14 @@ public class PermissionRoleInitializer {
     private static final String CENTRAL_KITCHEN_MANAGE = "CENTRAL_KITCHEN_MANAGE";
     private static final String SYSTEM_REPORT_VIEW = "SYSTEM_REPORT_VIEW";
 
+    // Supply Coordinator permissions
+    private static final String SUPPLY_ORDER_VIEW = "SUPPLY_ORDER_VIEW";
+    private static final String SUPPLY_ORDER_ASSIGN = "SUPPLY_ORDER_ASSIGN";
+    private static final String SUPPLY_DELIVERY_SCHEDULE = "SUPPLY_DELIVERY_SCHEDULE";
+    private static final String SUPPLY_DELIVERY_VIEW = "SUPPLY_DELIVERY_VIEW";
+    private static final String SUPPLY_DELIVERY_UPDATE = "SUPPLY_DELIVERY_UPDATE";
+    private static final String SUPPLY_ISSUE_MANAGE = "SUPPLY_ISSUE_MANAGE";
+
         // ===================== ROLE NAMES =====================
         private static final String ROLE_ADMIN = "ADMIN";
         private static final String ROLE_MANAGER = "MANAGER";
@@ -137,6 +145,12 @@ public class PermissionRoleInitializer {
                 ensurePermission(FRANCHISE_STORE_MANAGE, "Quản lý danh mục cửa hàng franchise");
                 ensurePermission(CENTRAL_KITCHEN_MANAGE, "Quản lý danh mục bếp trung tâm");
                 ensurePermission(SYSTEM_REPORT_VIEW, "Xem báo cáo tổng hợp toàn hệ thống");
+                ensurePermission(SUPPLY_ORDER_VIEW, "Xem và tổng hợp đơn hàng toàn hệ thống cho điều phối");
+                ensurePermission(SUPPLY_ORDER_ASSIGN, "Điều phối đơn hàng sang bếp xử lý");
+                ensurePermission(SUPPLY_DELIVERY_SCHEDULE, "Lập lịch giao hàng cho đơn");
+                ensurePermission(SUPPLY_DELIVERY_VIEW, "Theo dõi danh sách giao hàng điều phối");
+                ensurePermission(SUPPLY_DELIVERY_UPDATE, "Cập nhật trạng thái giao hàng");
+                ensurePermission(SUPPLY_ISSUE_MANAGE, "Xử lý sự cố thiếu hàng, trễ giao hoặc hủy đơn");
 
         log.debug("✅ Created {} permissions", permissionRepository.count());
     }
@@ -180,6 +194,12 @@ public class PermissionRoleInitializer {
         // Supply coordinator: nghiệp vụ điều phối + xem log
         Set<Permission> supplyCoordinatorPerms = new HashSet<>(operationalPerms);
         supplyCoordinatorPerms.add(permMap.get(LOG_VIEW_ACTIVITY));
+        supplyCoordinatorPerms.add(permMap.get(SUPPLY_ORDER_VIEW));
+        supplyCoordinatorPerms.add(permMap.get(SUPPLY_ORDER_ASSIGN));
+        supplyCoordinatorPerms.add(permMap.get(SUPPLY_DELIVERY_SCHEDULE));
+        supplyCoordinatorPerms.add(permMap.get(SUPPLY_DELIVERY_VIEW));
+        supplyCoordinatorPerms.add(permMap.get(SUPPLY_DELIVERY_UPDATE));
+        supplyCoordinatorPerms.add(permMap.get(SUPPLY_ISSUE_MANAGE));
 
         ensureRole(ROLE_ADMIN, adminPerms);
         ensureRole(ROLE_MANAGER, managerPerms);

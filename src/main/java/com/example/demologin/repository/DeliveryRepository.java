@@ -14,5 +14,8 @@ public interface DeliveryRepository extends JpaRepository<Delivery, String> {
     Optional<Delivery> findByOrder_Id(String orderId);
     Page<Delivery> findByOrder_Store_Id(String storeId, Pageable pageable);
     Page<Delivery> findByOrder_Store_IdAndStatus(String storeId, String status, Pageable pageable);
+    Page<Delivery> findByCoordinator_UserId(Long coordinatorId, Pageable pageable);
+    Page<Delivery> findByCoordinator_UserIdAndStatus(Long coordinatorId, String status, Pageable pageable);
+    long countByCoordinator_UserIdAndStatusIn(Long coordinatorId, Collection<String> statuses);
     long countByOrder_Store_IdAndStatusIn(String storeId, Collection<String> statuses);
 }

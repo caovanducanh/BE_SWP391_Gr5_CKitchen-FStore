@@ -31,8 +31,8 @@ class UserControllerTest {
 	@Test
 	void testGetAllUsers_emptyPage() {
 		Page<MemberResponse> emptyPage = new PageImpl<>(Collections.emptyList(), PageRequest.of(0, 20), 0);
-		when(userService.getAllUsers(0, 20)).thenReturn(emptyPage);
-		Object result = userController.getAllUsers(0, 20);
+		when(userService.getAllUsers(null, null, 0, 20)).thenReturn(emptyPage);
+		Object result = userController.getAllUsers(null, null, 0, 20);
 		assertNotNull(result);
 		assertTrue(result instanceof Page);
 		assertTrue(((Page<?>) result).isEmpty());

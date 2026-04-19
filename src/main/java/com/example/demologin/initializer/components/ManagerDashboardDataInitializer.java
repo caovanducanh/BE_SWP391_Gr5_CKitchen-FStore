@@ -66,9 +66,11 @@ public class ManagerDashboardDataInitializer {
         log.info("Creating manager dashboard seed data...");
 
         ensurePriorityConfigs();
-        Kitchen kitchen = ensureKitchen();
-        ensureKitchenStaffAssignment(kitchen);
-        Store store = ensureStore();
+                Kitchen kitchen = ensureKitchen();
+                Kitchen kitchen2 = ensureKitchen2();
+                ensureKitchenStaffAssignment(kitchen);
+                Store store = ensureStore();
+                Store store2 = ensureStore2();
 
         Product product1 = productRepository.findById("PROD001")
                 .orElseThrow(() -> new IllegalStateException("Product PROD001 not found"));
@@ -122,6 +124,36 @@ public class ManagerDashboardDataInitializer {
                 LocalDateTime.now().minusDays(4), LocalDate.now().minusDays(2),
                 "Hủy do hết sản phẩm", "storestaff", new BigDecimal("0")
         );
+        Order order7 = ensureOrder(
+                "ORD007", store2, null, OrderStatus.PENDING, "HIGH",
+                LocalDateTime.now().minusHours(6), LocalDate.now(),
+                "Đơn mới cần điều phối bếp", "storestaff", new BigDecimal("780000")
+        );
+        Order order8 = ensureOrder(
+                "ORD008", store2, kitchen2, OrderStatus.ASSIGNED, "NORMAL",
+                LocalDateTime.now().minusHours(10), LocalDate.now().plusDays(1),
+                "Đã phân bếp chi nhánh 2", "storestaff", new BigDecimal("460000")
+        );
+        Order order9 = ensureOrder(
+                "ORD009", store2, kitchen2, OrderStatus.SHIPPING, "HIGH",
+                LocalDateTime.now().minusDays(1), LocalDate.now(),
+                "Đang giao tuyến Q7", "storestaff", new BigDecimal("510000")
+        );
+        Order order10 = ensureOrder(
+                "ORD010", store2, kitchen2, OrderStatus.CANCELLED, "NORMAL",
+                LocalDateTime.now().minusDays(2), LocalDate.now().minusDays(1),
+                "Hủy do khách đổi kế hoạch", "storestaff", new BigDecimal("0")
+        );
+        Order order11 = ensureOrder(
+                "ORD011", store, kitchen, OrderStatus.IN_PROGRESS, "HIGH",
+                LocalDateTime.now().minusDays(2), LocalDate.now().minusDays(1),
+                "Đơn quá hạn cần theo dõi", "storestaff", new BigDecimal("670000")
+        );
+        Order order12 = ensureOrder(
+                "ORD012", store2, kitchen2, OrderStatus.DELIVERED, "LOW",
+                LocalDateTime.now().minusDays(5), LocalDate.now().minusDays(3),
+                "Đã hoàn tất giao nhận", "storestaff", new BigDecimal("250000")
+        );
 
         // ===== ORDER ITEMS =====
         ensureOrderItem(order1, product1, 50, "piece");
@@ -134,6 +166,15 @@ public class ManagerDashboardDataInitializer {
         ensureOrderItem(order5, product1, 30, "piece");
         ensureOrderItem(order5, product2, 15, "piece");
         ensureOrderItem(order6, product1, 10, "piece");
+        ensureOrderItem(order7, product1, 45, "piece");
+        ensureOrderItem(order7, product2, 18, "piece");
+        ensureOrderItem(order8, product1, 28, "piece");
+        ensureOrderItem(order8, product2, 22, "piece");
+        ensureOrderItem(order9, product1, 35, "piece");
+        ensureOrderItem(order10, product2, 16, "piece");
+        ensureOrderItem(order11, product1, 42, "piece");
+        ensureOrderItem(order11, product2, 27, "piece");
+        ensureOrderItem(order12, product2, 14, "piece");
 
         ensureBatch(
                 "BATCH001", order1, 1, plan1, product1, kitchen,
@@ -154,6 +195,10 @@ public class ManagerDashboardDataInitializer {
         ensureDelivery("DEL001", order3, coordinator, "ASSIGNED", LocalDateTime.now().minusHours(2));
         ensureDelivery("DEL002", order4, coordinator, "SHIPPING", LocalDateTime.now().minusDays(1));
         ensureDelivery("DEL003", order5, coordinator, "DELIVERED", LocalDateTime.now().minusDays(2));
+                ensureDelivery("DEL004", order8, coordinator, "ASSIGNED", LocalDateTime.now().minusHours(5));
+                ensureDelivery("DEL005", order9, coordinator, "DELAYED", LocalDateTime.now().minusHours(20));
+                ensureDelivery("DEL006", order10, coordinator, "CANCELLED", LocalDateTime.now().minusHours(30));
+                ensureDelivery("DEL007", order12, coordinator, "DELIVERED", LocalDateTime.now().minusDays(4));
 
         log.info("✅ Manager dashboard seed data ready");
     }
@@ -195,6 +240,33 @@ public class ManagerDashboardDataInitializer {
                 .updatedAt(LocalDateTime.now())
                 .build()));
     }
+
+        private Kitchen ensureKitchen2() {
+                return kitchenRepository.findById("KIT002").orElseGet(() -> kitchenRepository.save(Kitchen.builder()
+                                .id("KIT002")
+                                .name("Central Kitchen Thu Duc")
+                                .address("25 Vo Van Ngan, Thu Duc, HCMC")
+                                .phone("0902000003")
+                                .capacity(420)
+                                .status("ACTIVE")
+                                .createdAt(LocalDateTime.now())
+                                .updatedAt(LocalDateTime.now())
+                                .build()));
+        }
+
+        private Store ensureStore2() {
+                return storeRepository.findById("ST002").orElseGet(() -> storeRepository.save(Store.builder()
+                                .id("ST002")
+                                .name("Store District 7")
+                                .address("88 Nguyen Thi Thap, District 7, HCMC")
+                                .phone("0901000002")
+                                .manager("manager")
+                                .status("ACTIVE")
+                                .openDate(LocalDate.now().minusMonths(2))
+                                .createdAt(LocalDateTime.now())
+                                .updatedAt(LocalDateTime.now())
+                                .build()));
+        }
 
         private void ensureKitchenStaffAssignment(Kitchen kitchen) {
                 boolean changed = false;
@@ -245,32 +317,73 @@ public class ManagerDashboardDataInitializer {
                               String notes,
                               String createdBy,
                               BigDecimal total) {
-        return orderRepository.findById(id).orElseGet(() -> orderRepository.save(Order.builder()
-                .id(id)
-                .store(store)
-                .kitchen(kitchen)
-                .status(status)
-                .priority(priority)
-                .createdAt(createdAt)
-                .requestedDate(requestedDate)
-                .notes(notes)
-                .createdBy(createdBy)
-                .total(total)
-                .updatedAt(LocalDateTime.now())
-                .build()));
+        return orderRepository.findById(id)
+                .map(existing -> {
+                    existing.setStore(store);
+                    existing.setKitchen(kitchen);
+                    existing.setStatus(status);
+                    existing.setPriority(priority);
+                    existing.setCreatedAt(createdAt);
+                    existing.setRequestedDate(requestedDate);
+                    existing.setNotes(notes);
+                    existing.setCreatedBy(createdBy);
+                    existing.setTotal(total);
+                    existing.setUpdatedAt(LocalDateTime.now());
+                    return orderRepository.save(existing);
+                })
+                .orElseGet(() -> orderRepository.save(Order.builder()
+                        .id(id)
+                        .store(store)
+                        .kitchen(kitchen)
+                        .status(status)
+                        .priority(priority)
+                        .createdAt(createdAt)
+                        .requestedDate(requestedDate)
+                        .notes(notes)
+                        .createdBy(createdBy)
+                        .total(total)
+                        .updatedAt(LocalDateTime.now())
+                        .build()));
     }
 
     private void ensureDelivery(String id, Order order, User coordinator, String status, LocalDateTime assignedAt) {
-        deliveryRepository.findById(id).orElseGet(() -> deliveryRepository.save(Delivery.builder()
-                .id(id)
-                .order(order)
-                .coordinator(coordinator)
-                .status(status)
-                .assignedAt(assignedAt)
-                .createdAt(assignedAt.minusMinutes(30))
-                .updatedAt(LocalDateTime.now())
-                .build()));
+        deliveryRepository.findById(id)
+                .map(existing -> {
+                    existing.setOrder(order);
+                    existing.setCoordinator(coordinator);
+                    existing.setStatus(status);
+                    existing.setAssignedAt(assignedAt);
+                    existing.setDeliveredAt("DELIVERED".equalsIgnoreCase(status) ? assignedAt.plusHours(4) : null);
+                    existing.setNotes(buildDeliveryNote(status));
+                    existing.setReceiverName("DELIVERED".equalsIgnoreCase(status) ? "Store Receiver" : null);
+                    existing.setTemperatureOk("DELIVERED".equalsIgnoreCase(status) ? Boolean.TRUE : null);
+                    existing.setUpdatedAt(LocalDateTime.now());
+                    return deliveryRepository.save(existing);
+                })
+                .orElseGet(() -> deliveryRepository.save(Delivery.builder()
+                        .id(id)
+                        .order(order)
+                        .coordinator(coordinator)
+                        .status(status)
+                        .assignedAt(assignedAt)
+                        .deliveredAt("DELIVERED".equalsIgnoreCase(status) ? assignedAt.plusHours(4) : null)
+                        .notes(buildDeliveryNote(status))
+                        .receiverName("DELIVERED".equalsIgnoreCase(status) ? "Store Receiver" : null)
+                        .temperatureOk("DELIVERED".equalsIgnoreCase(status) ? Boolean.TRUE : null)
+                        .createdAt(assignedAt.minusMinutes(30))
+                        .updatedAt(LocalDateTime.now())
+                        .build()));
     }
+
+        private String buildDeliveryNote(String status) {
+                if ("DELAYED".equalsIgnoreCase(status)) {
+                        return "Trễ chuyến do kẹt xe giờ cao điểm";
+                }
+                if ("CANCELLED".equalsIgnoreCase(status)) {
+                        return "Hủy chuyến do cửa hàng thay đổi nhu cầu";
+                }
+                return "";
+        }
 
     private void ensureBatch(String id,
                              Order order,

@@ -33,6 +33,7 @@ public class PermissionRoleInitializer {
 
     // ===================== PERMISSION CODES =====================
     private static final String USER_MANAGE = "USER_MANAGE";  // mới thêm
+    private static final String ADMIN_USER_MANAGEMENT = "ADMIN_USER_MANAGEMENT";
     private static final String USER_TOKEN_MANAGEMENT = "USER_TOKEN_MANAGEMENT";
     private static final String TOKEN_INVALIDATE_OWN = "TOKEN_INVALIDATE_OWN";
     private static final String TOKEN_INVALIDATE_USER = "TOKEN_INVALIDATE_USER";
@@ -72,6 +73,10 @@ public class PermissionRoleInitializer {
     private static final String PRODUCTION_PLAN_VIEW = "PRODUCTION_PLAN_VIEW";
     private static final String PRODUCTION_PLAN_CREATE = "PRODUCTION_PLAN_CREATE";
     private static final String KITCHEN_INVENTORY_VIEW = "KITCHEN_INVENTORY_VIEW";
+    private static final String SYSTEM_CONFIG_MANAGE = "SYSTEM_CONFIG_MANAGE";
+    private static final String FRANCHISE_STORE_MANAGE = "FRANCHISE_STORE_MANAGE";
+    private static final String CENTRAL_KITCHEN_MANAGE = "CENTRAL_KITCHEN_MANAGE";
+    private static final String SYSTEM_REPORT_VIEW = "SYSTEM_REPORT_VIEW";
 
         // ===================== ROLE NAMES =====================
         private static final String ROLE_ADMIN = "ADMIN";
@@ -96,6 +101,7 @@ public class PermissionRoleInitializer {
         log.debug("📋 Creating system permissions...");
 
                 ensurePermission(USER_MANAGE, "Quản lý user (Admin)");
+                ensurePermission(ADMIN_USER_MANAGEMENT, "Quản lý phiên đăng nhập của người dùng (Admin)");
                 ensurePermission(USER_TOKEN_MANAGEMENT, "Quản lý token của user");
                 ensurePermission(TOKEN_INVALIDATE_OWN, "Hủy token của bản thân");
                 ensurePermission(TOKEN_INVALIDATE_USER, "Hủy token của user cụ thể");
@@ -127,6 +133,10 @@ public class PermissionRoleInitializer {
                 ensurePermission(PRODUCTION_PLAN_VIEW, "Xem kế hoạch sản xuất");
                 ensurePermission(PRODUCTION_PLAN_CREATE, "Tạo kế hoạch sản xuất");
                 ensurePermission(KITCHEN_INVENTORY_VIEW, "Xem tồn kho nguyên liệu bếp trung tâm");
+                ensurePermission(SYSTEM_CONFIG_MANAGE, "Quản lý cấu hình hệ thống và tham số vận hành");
+                ensurePermission(FRANCHISE_STORE_MANAGE, "Quản lý danh mục cửa hàng franchise");
+                ensurePermission(CENTRAL_KITCHEN_MANAGE, "Quản lý danh mục bếp trung tâm");
+                ensurePermission(SYSTEM_REPORT_VIEW, "Xem báo cáo tổng hợp toàn hệ thống");
 
         log.debug("✅ Created {} permissions", permissionRepository.count());
     }

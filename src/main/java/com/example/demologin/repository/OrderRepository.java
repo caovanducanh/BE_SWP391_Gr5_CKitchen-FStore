@@ -10,10 +10,18 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, String>, JpaSpecificationExecutor<Order> {
     long countByStatusIn(Collection<OrderStatus> statuses);
+    long countByStatus(OrderStatus status);
+    long countByCreatedAtBetween(LocalDateTime fromDateTime, LocalDateTime toDateTime);
+    long countByCreatedAtGreaterThanEqual(LocalDateTime fromDateTime);
+    long countByCreatedAtLessThanEqual(LocalDateTime toDateTime);
+    long countByStatusAndCreatedAtBetween(OrderStatus status, LocalDateTime fromDateTime, LocalDateTime toDateTime);
+    long countByStatusAndCreatedAtGreaterThanEqual(OrderStatus status, LocalDateTime fromDateTime);
+    long countByStatusAndCreatedAtLessThanEqual(OrderStatus status, LocalDateTime toDateTime);
     long countByStore_Id(String storeId);
     long countByStore_IdAndStatus(String storeId, OrderStatus status);
     long countByStatusAndKitchenIsNull(OrderStatus status);

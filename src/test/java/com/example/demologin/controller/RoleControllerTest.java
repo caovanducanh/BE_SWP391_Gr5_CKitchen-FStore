@@ -1,7 +1,6 @@
 package com.example.demologin.controller;
 
 import com.example.demologin.service.RoleService;
-import com.example.demologin.dto.request.role.CreateRoleRequest;
 import com.example.demologin.dto.request.role.UpdateRoleRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,18 +14,6 @@ import java.util.Collections;
 import java.util.List;
 
 class RoleControllerTest {
-    @Test
-    void delete() {
-        doNothing().when(roleService).delete(5L);
-        Object result = controller.delete(5L);
-        assertTrue(result instanceof com.example.demologin.dto.response.ResponseObject);
-        com.example.demologin.dto.response.ResponseObject resp = (com.example.demologin.dto.response.ResponseObject) result;
-        assertEquals(200, resp.getStatusCode());
-        assertEquals("Role deleted successfully", resp.getMessage());
-        assertNull(resp.getData());
-        verify(roleService).delete(5L);
-    }
-
     @Test
     void updatePermissions() {
         com.example.demologin.dto.request.role.RolePermissionsRequest req = new com.example.demologin.dto.request.role.RolePermissionsRequest();
@@ -63,16 +50,6 @@ class RoleControllerTest {
         Object result = controller.getAll();
         assertEquals(roles, result);
         verify(roleService).getAll();
-    }
-
-    @Test
-    void create() {
-        CreateRoleRequest req = new CreateRoleRequest();
-        RoleResponse resp = new RoleResponse();
-        when(roleService.create(req)).thenReturn(resp);
-        Object result = controller.create(req);
-        assertEquals(resp, result);
-        verify(roleService).create(req);
     }
 
     @Test

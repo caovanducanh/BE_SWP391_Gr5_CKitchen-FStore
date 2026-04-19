@@ -1,20 +1,24 @@
 package com.example.demologin.controller;
 
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.example.demologin.annotation.ApiResponse;
 import com.example.demologin.annotation.SecuredEndpoint;
 import com.example.demologin.annotation.SmartCache;
-import com.example.demologin.dto.request.role.CreateRoleRequest;
 import com.example.demologin.dto.request.role.RolePermissionsRequest;
 import com.example.demologin.dto.request.role.UpdateRoleRequest;
-import com.example.demologin.dto.response.ResponseObject;
 import com.example.demologin.service.RoleService;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @AllArgsConstructor
@@ -33,16 +37,6 @@ import org.springframework.web.bind.annotation.*;
         return roleService.getAll();
     }
 
-    @PostMapping
-    @ApiResponse(message = "Role created successfully")
-    @SecuredEndpoint("ROLE_CREATE")
-    @SmartCache
-    @Operation(summary = "Create new role", 
-               description = "Create a new role with specified name and description")
-    public Object create(@RequestBody @Valid CreateRoleRequest req) {
-        return roleService.create(req);
-    }
-
     @PutMapping("/{id}")
     @ApiResponse(message = "Role updated successfully")
     @SmartCache
@@ -53,17 +47,6 @@ import org.springframework.web.bind.annotation.*;
             @Parameter(description = "Role ID") @PathVariable Long id, 
             @RequestBody @Valid UpdateRoleRequest req) {
         return roleService.update(id, req);
-    }
-
-    @DeleteMapping("/{id}")
-//    @ApiResponse(message = "Role deleted successfully")
-    @SmartCache
-    @SecuredEndpoint("ROLE_DELETE")
-    @Operation(summary = "Delete role", 
-               description = "Delete a role from the system")
-    public ResponseObject delete(@PathVariable Long id) {
-        roleService.delete(id);
-        return new ResponseObject(HttpStatus.OK.value(), "Role deleted successfully", null);
     }
 
     @PutMapping("/{id}/permissions")

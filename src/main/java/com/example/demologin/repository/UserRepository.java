@@ -3,6 +3,7 @@ package com.example.demologin.repository;
 import java.util.List;
 import java.util.Optional;
 
+import com.example.demologin.enums.UserStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,6 +20,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
 
     Page<User> findByRole_Name(String roleName, Pageable pageable);
+
+    Page<User> findByStatus(UserStatus status, Pageable pageable);
+
+    Page<User> findByRole_NameAndStatus(String roleName, UserStatus status, Pageable pageable);
 
     List<User> findAllByRole_Name(String roleName);
 

@@ -7,7 +7,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface StoreInventoryRepository extends JpaRepository<StoreInventory, Integer>, JpaSpecificationExecutor<StoreInventory> {
@@ -20,5 +22,9 @@ public interface StoreInventoryRepository extends JpaRepository<StoreInventory, 
 
     @Query("select s from StoreInventory s where s.quantity <= s.minStock order by s.quantity asc")
     List<StoreInventory> findLowStockItems();
+
+    List<StoreInventory> findByStoreIdAndProductIdIn(String storeId, Collection<String> productIds);
+
+    Optional<StoreInventory> findByStoreIdAndProductId(String storeId, String productId);
 }
 

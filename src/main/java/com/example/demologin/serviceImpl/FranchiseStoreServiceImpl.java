@@ -409,6 +409,8 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
                 .storeName(inv.getStore().getName())
                 .productId(inv.getProduct().getId())
                 .productName(inv.getProduct().getName())
+                .price(inv.getProduct().getPrice())
+                .cost(inv.getProduct().getCost())
                 .quantity(inv.getQuantity())
                 .unit(inv.getUnit())
                 .minStock(inv.getMinStock())

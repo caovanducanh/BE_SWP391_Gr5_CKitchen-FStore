@@ -7,6 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,7 +19,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "sales_records")
+@Table(name = "sales_records", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_sales_records_store_date", columnNames = {"store_id", "date"})
+})
 @Getter
 @Setter
 @NoArgsConstructor

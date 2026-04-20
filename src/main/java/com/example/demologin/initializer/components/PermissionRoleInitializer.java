@@ -66,6 +66,11 @@ public class PermissionRoleInitializer {
     private static final String DELIVERY_VIEW = "DELIVERY_VIEW";
     private static final String DELIVERY_CONFIRM = "DELIVERY_CONFIRM";
     private static final String STORE_INVENTORY_VIEW = "STORE_INVENTORY_VIEW";
+    private static final String SALES_REPORT_TEMPLATE_DOWNLOAD = "SALES_REPORT_TEMPLATE_DOWNLOAD";
+    private static final String SALES_REPORT_IMPORT = "SALES_REPORT_IMPORT";
+    private static final String SALES_REPORT_CLEAR = "SALES_REPORT_CLEAR";
+    private static final String SALES_REPORT_VIEW_OWN = "SALES_REPORT_VIEW_OWN";
+    private static final String SALES_REPORT_VIEW = "SALES_REPORT_VIEW";
 
     // Central Kitchen Staff permissions
     private static final String ORDER_ASSIGN = "ORDER_ASSIGN";
@@ -136,6 +141,11 @@ public class PermissionRoleInitializer {
                 ensurePermission(DELIVERY_VIEW, "Xem trạng thái giao hàng");
                 ensurePermission(DELIVERY_CONFIRM, "Xác nhận nhận hàng và phản hồi chất lượng");
                 ensurePermission(STORE_INVENTORY_VIEW, "Xem tồn kho cửa hàng franchise");
+                ensurePermission(SALES_REPORT_TEMPLATE_DOWNLOAD, "Tải file excel mẫu để báo cáo doanh số bán hàng");
+                ensurePermission(SALES_REPORT_IMPORT, "Import file excel doanh số bán hàng theo ngày");
+                ensurePermission(SALES_REPORT_CLEAR, "Xóa báo cáo doanh số theo ngày để import lại");
+                ensurePermission(SALES_REPORT_VIEW_OWN, "Xem doanh số theo ngày của cửa hàng đang phụ trách");
+                ensurePermission(SALES_REPORT_VIEW, "Xem doanh thu theo ngày của cửa hàng");
                 ensurePermission(ORDER_ASSIGN, "Tiếp nhận và gán đơn hàng cho bếp xử lý");
                 ensurePermission(ORDER_STATUS_UPDATE, "Cập nhật trạng thái đơn hàng vận hành bếp");
                 ensurePermission(PRODUCTION_PLAN_VIEW, "Xem kế hoạch sản xuất");
@@ -190,6 +200,7 @@ public class PermissionRoleInitializer {
         managerPerms.add(permMap.get(INVENTORY_VIEW));
         managerPerms.add(permMap.get(MANAGER_DASHBOARD_VIEW));
         managerPerms.add(permMap.get(STORE_VIEW));
+        managerPerms.add(permMap.get(SALES_REPORT_VIEW));
 
         // Supply coordinator: nghiệp vụ điều phối + xem log
         Set<Permission> supplyCoordinatorPerms = new HashSet<>(operationalPerms);
@@ -223,6 +234,10 @@ public class PermissionRoleInitializer {
         franchiseStorePerms.add(permMap.get(DELIVERY_CONFIRM));
         franchiseStorePerms.add(permMap.get(STORE_INVENTORY_VIEW));
         franchiseStorePerms.add(permMap.get(STORE_VIEW));
+        franchiseStorePerms.add(permMap.get(SALES_REPORT_TEMPLATE_DOWNLOAD));
+        franchiseStorePerms.add(permMap.get(SALES_REPORT_IMPORT));
+        franchiseStorePerms.add(permMap.get(SALES_REPORT_CLEAR));
+        franchiseStorePerms.add(permMap.get(SALES_REPORT_VIEW_OWN));
         ensureRole(ROLE_FRANCHISE_STORE_STAFF, franchiseStorePerms);
 
         ensureRole(ROLE_SHIPPER, operationalPerms);

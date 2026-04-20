@@ -3,6 +3,7 @@ package com.example.demologin.dto.response;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -14,6 +15,8 @@ public class StoreInventoryResponse {
     private String storeName;
     private String productId;
     private String productName;
+    private BigDecimal price;
+    private BigDecimal cost;
     private Integer quantity;
     private String unit;
     private Integer minStock;

@@ -10,7 +10,6 @@ import com.example.demologin.entity.Order;
 import com.example.demologin.entity.OrderPriorityConfig;
 import com.example.demologin.entity.Product;
 import com.example.demologin.entity.ProductionPlan;
-import com.example.demologin.entity.SalesRecord;
 import com.example.demologin.entity.Store;
 import com.example.demologin.entity.StoreInventory;
 import com.example.demologin.entity.User;
@@ -26,7 +25,6 @@ import com.example.demologin.repository.OrderPriorityConfigRepository;
 import com.example.demologin.repository.OrderRepository;
 import com.example.demologin.repository.ProductRepository;
 import com.example.demologin.repository.ProductionPlanRepository;
-import com.example.demologin.repository.SalesRecordRepository;
 import com.example.demologin.repository.StoreInventoryRepository;
 import com.example.demologin.repository.StoreRepository;
 import com.example.demologin.repository.UserRepository;
@@ -53,7 +51,6 @@ public class ManagerDashboardDataInitializer {
     private final OrderItemRepository orderItemRepository;
     private final KitchenInventoryRepository kitchenInventoryRepository;
     private final StoreInventoryRepository storeInventoryRepository;
-    private final SalesRecordRepository salesRecordRepository;
     private final InventoryDisposalRepository inventoryDisposalRepository;
     private final ProductRepository productRepository;
     private final DeliveryRepository deliveryRepository;
@@ -184,8 +181,6 @@ public class ManagerDashboardDataInitializer {
 
         ensureKitchenInventories(ingredient1, ingredient2);
         ensureStoreInventories(store, product1, product2);
-
-        ensureSalesRecords(store);
         ensureInventoryDisposals();
 
         // ===== DELIVERIES =====
@@ -480,28 +475,6 @@ public class ManagerDashboardDataInitializer {
                         .updatedAt(LocalDateTime.now())
                         .build()
         ));
-    }
-
-    private void ensureSalesRecords(Store store) {
-        salesRecordRepository.findById("SR001").orElseGet(() -> salesRecordRepository.save(SalesRecord.builder()
-                .id("SR001")
-                .store(store)
-                .date(LocalDate.now().minusDays(1))
-                .totalRevenue(new BigDecimal("3200000"))
-                .recordedBy("manager")
-                .recordedAt(LocalDateTime.now().minusDays(1))
-                .createdAt(LocalDateTime.now().minusDays(1))
-                .build()));
-
-        salesRecordRepository.findById("SR002").orElseGet(() -> salesRecordRepository.save(SalesRecord.builder()
-                .id("SR002")
-                .store(store)
-                .date(LocalDate.now())
-                .totalRevenue(new BigDecimal("2800000"))
-                .recordedBy("manager")
-                .recordedAt(LocalDateTime.now())
-                .createdAt(LocalDateTime.now())
-                .build()));
     }
 
     private void ensureInventoryDisposals() {

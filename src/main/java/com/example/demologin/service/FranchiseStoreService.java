@@ -22,6 +22,7 @@ public interface FranchiseStoreService {
     OrderTimelineResponse getOrderTimeline(String orderId, Principal principal);
     Page<DeliveryResponse> getDeliveries(String status, Principal principal, int page, int size);
     DeliveryResponse confirmReceipt(String deliveryId, ConfirmReceiptRequest request);
+    DeliveryResponse confirmReceiptByOrderId(String orderId, ConfirmReceiptRequest request, Principal principal);
     Page<StoreInventoryResponse> getStoreInventory(String productId, String productName, Principal principal, int page, int size);
     StoreResponse getMyStore(Principal principal);
     StoreOverviewResponse getOverview(Principal principal);

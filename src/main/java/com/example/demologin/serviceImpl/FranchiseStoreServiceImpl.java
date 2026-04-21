@@ -59,6 +59,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FranchiseStoreServiceImpl implements FranchiseStoreService {
 
+    private static final String DELIVERY_WAITING_STORE_CONFIRM = "WAITING_CONFIRM";
+
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final DeliveryRepository deliveryRepository;
@@ -201,12 +203,44 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new NotFoundException("Delivery not found: " + deliveryId));
 
+        return applyConfirmReceipt(delivery, request);
+    }
+
+    @Override
+    @Transactional
+    public DeliveryResponse confirmReceiptByOrderId(String orderId, ConfirmReceiptRequest request, Principal principal) {
+        Store currentStore = getCurrentStore(principal);
+        if (currentStore == null) {
+            throw new IllegalStateException("Only store staff can confirm receipt");
+        }
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
+
+        if (order.getStore() == null || !currentStore.getId().equals(order.getStore().getId())) {
+            throw new NotFoundException("Order not found in current store: " + orderId);
+        }
+
+        Delivery delivery = deliveryRepository.findByOrder_Id(orderId)
+                .orElseThrow(() -> new NotFoundException("Delivery not found for order: " + orderId));
+
+        return applyConfirmReceipt(delivery, request);
+    }
+
+    private DeliveryResponse applyConfirmReceipt(Delivery delivery, ConfirmReceiptRequest request) {
+        String deliveryStatus = delivery.getStatus() == null ? "" : delivery.getStatus().trim().toUpperCase();
+        if (!"SHIPPING".equals(deliveryStatus) && !DELIVERY_WAITING_STORE_CONFIRM.equals(deliveryStatus)) {
+            throw new BadRequestException("Delivery is not ready for store confirmation: " + delivery.getStatus());
+        }
+
         delivery.setReceiverName(request.getReceiverName());
         delivery.setTemperatureOk(request.getTemperatureOk());
         if (request.getNotes() != null) {
             delivery.setNotes(request.getNotes());
         }
-        delivery.setDeliveredAt(LocalDateTime.now());
+        if (delivery.getDeliveredAt() == null) {
+            delivery.setDeliveredAt(LocalDateTime.now());
+        }
         delivery.setStatus("DELIVERED");
         delivery.setUpdatedAt(LocalDateTime.now());
 
@@ -391,9 +425,12 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
                 .id(delivery.getId())
                 .orderId(delivery.getOrder().getId())
                 .coordinatorName(delivery.getCoordinator() != null ? delivery.getCoordinator().getFullName() : null)
+                .shipperName(delivery.getShipper() != null ? delivery.getShipper().getFullName() : null)
                 .status(delivery.getStatus())
                 .assignedAt(delivery.getAssignedAt())
+                .pickedUpAt(delivery.getPickedUpAt())
                 .deliveredAt(delivery.getDeliveredAt())
+                .pickupQrCode(delivery.getPickupQrCode())
                 .notes(delivery.getNotes())
                 .receiverName(delivery.getReceiverName())
                 .temperatureOk(delivery.getTemperatureOk())

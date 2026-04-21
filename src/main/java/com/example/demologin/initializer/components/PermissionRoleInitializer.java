@@ -91,6 +91,11 @@ public class PermissionRoleInitializer {
     private static final String SUPPLY_DELIVERY_UPDATE = "SUPPLY_DELIVERY_UPDATE";
     private static final String SUPPLY_ISSUE_MANAGE = "SUPPLY_ISSUE_MANAGE";
 
+    // Shipper permissions
+    private static final String SHIPPER_DELIVERY_VIEW = "SHIPPER_DELIVERY_VIEW";
+    private static final String SHIPPER_DELIVERY_CLAIM = "SHIPPER_DELIVERY_CLAIM";
+    private static final String SHIPPER_DELIVERY_UPDATE = "SHIPPER_DELIVERY_UPDATE";
+
         // ===================== ROLE NAMES =====================
         private static final String ROLE_ADMIN = "ADMIN";
         private static final String ROLE_MANAGER = "MANAGER";
@@ -161,6 +166,9 @@ public class PermissionRoleInitializer {
                 ensurePermission(SUPPLY_DELIVERY_VIEW, "Theo dõi danh sách giao hàng điều phối");
                 ensurePermission(SUPPLY_DELIVERY_UPDATE, "Cập nhật trạng thái giao hàng");
                 ensurePermission(SUPPLY_ISSUE_MANAGE, "Xử lý sự cố thiếu hàng, trễ giao hoặc hủy đơn");
+                ensurePermission(SHIPPER_DELIVERY_VIEW, "Xem danh sách đơn chờ nhận và đơn đang giao của shipper");
+                ensurePermission(SHIPPER_DELIVERY_CLAIM, "Quét QR để nhận đơn giao");
+                ensurePermission(SHIPPER_DELIVERY_UPDATE, "Shipper cập nhật đã giao thành công và chờ cửa hàng xác nhận");
 
         log.debug("✅ Created {} permissions", permissionRepository.count());
     }
@@ -240,7 +248,11 @@ public class PermissionRoleInitializer {
         franchiseStorePerms.add(permMap.get(SALES_REPORT_VIEW_OWN));
         ensureRole(ROLE_FRANCHISE_STORE_STAFF, franchiseStorePerms);
 
-        ensureRole(ROLE_SHIPPER, operationalPerms);
+        Set<Permission> shipperPerms = new HashSet<>(operationalPerms);
+        shipperPerms.add(permMap.get(SHIPPER_DELIVERY_VIEW));
+        shipperPerms.add(permMap.get(SHIPPER_DELIVERY_CLAIM));
+        shipperPerms.add(permMap.get(SHIPPER_DELIVERY_UPDATE));
+        ensureRole(ROLE_SHIPPER, shipperPerms);
 
         log.debug("✅ Created {} roles", roleRepository.count());
     }

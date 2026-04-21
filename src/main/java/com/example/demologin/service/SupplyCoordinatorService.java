@@ -5,6 +5,8 @@ import com.example.demologin.dto.request.supplycoordinator.HandleIssueRequest;
 import com.example.demologin.dto.request.supplycoordinator.ScheduleDeliveryRequest;
 import com.example.demologin.dto.request.supplycoordinator.UpdateDeliveryStatusRequest;
 import com.example.demologin.dto.response.DeliveryResponse;
+import com.example.demologin.dto.response.OrderHolderResponse;
+import com.example.demologin.dto.response.OrderPickupQrResponse;
 import com.example.demologin.dto.response.OrderResponse;
 import com.example.demologin.dto.response.SupplyCoordinatorOverviewResponse;
 import org.springframework.data.domain.Page;
@@ -35,6 +37,10 @@ public interface SupplyCoordinatorService {
     Page<DeliveryResponse> getDeliveries(String status, int page, int size, Principal principal);
 
     DeliveryResponse updateDeliveryStatus(String deliveryId, UpdateDeliveryStatusRequest request, Principal principal);
+
+    OrderPickupQrResponse getOrderPickupQr(String orderId, Principal principal);
+
+    OrderHolderResponse getOrderHolder(String orderId, Principal principal);
 
     OrderResponse handleIssue(String orderId, HandleIssueRequest request, Principal principal);
 

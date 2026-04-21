@@ -36,11 +36,20 @@ public class Delivery {
     @JoinColumn(name = "coordinator_id", nullable = false, referencedColumnName = "userId")
     private User coordinator;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shipper_id", referencedColumnName = "userId")
+    private User shipper;
+
     @Column(nullable = false, length = 20)
     private String status;
 
     @Column(nullable = false)
     private LocalDateTime assignedAt;
+
+    @Column(name = "pickup_qr_code", unique = true, length = 120)
+    private String pickupQrCode;
+
+    private LocalDateTime pickedUpAt;
 
     private LocalDateTime deliveredAt;
 

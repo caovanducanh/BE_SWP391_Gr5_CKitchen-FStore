@@ -30,6 +30,7 @@ import com.example.demologin.repository.StoreRepository;
 import com.example.demologin.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +43,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class ManagerDashboardDataInitializer {
+
+        @Value("${app.seed.orders.enabled:false}")
+        private boolean seedOrdersEnabled;
 
     private final StoreRepository storeRepository;
     private final KitchenRepository kitchenRepository;
@@ -90,110 +94,114 @@ public class ManagerDashboardDataInitializer {
                 "kitchen", "Afternoon production wave"
         );
 
-        // ===== ORDERS =====
-        Order order1 = ensureOrder(
-                "ORD001", store, kitchen, OrderStatus.PENDING, "HIGH",
-                LocalDateTime.now().minusHours(4), LocalDate.now().plusDays(1),
-                "Cần bổ sung gấp ngượi liệu", "storestaff", new BigDecimal("650000")
-        );
-        Order order2 = ensureOrder(
-                "ORD002", store, kitchen, OrderStatus.IN_PROGRESS, "NORMAL",
-                LocalDateTime.now().minusHours(8), LocalDate.now().plusDays(2),
-                "Nhập hàng tuần", "storestaff", new BigDecimal("430000")
-        );
-        Order order3 = ensureOrder(
-                "ORD003", store, kitchen, OrderStatus.ASSIGNED, "NORMAL",
-                LocalDateTime.now().minusDays(1), LocalDate.now().plusDays(3),
-                "Sự kiện cuối tuần", "storestaff", new BigDecimal("520000")
-        );
-        Order order4 = ensureOrder(
-                "ORD004", store, kitchen, OrderStatus.SHIPPING, "HIGH",
-                LocalDateTime.now().minusDays(2), LocalDate.now(),
-                "Giao hôm nay", "storestaff", new BigDecimal("310000")
-        );
-        Order order5 = ensureOrder(
-                "ORD005", store, kitchen, OrderStatus.DELIVERED, "NORMAL",
-                LocalDateTime.now().minusDays(3), LocalDate.now().minusDays(1),
-                "Đã nhận 28/03", "storestaff", new BigDecimal("290000")
-        );
-        Order order6 = ensureOrder(
-                "ORD006", store, kitchen, OrderStatus.CANCELLED, "LOW",
-                LocalDateTime.now().minusDays(4), LocalDate.now().minusDays(2),
-                "Hủy do hết sản phẩm", "storestaff", new BigDecimal("0")
-        );
-        Order order7 = ensureOrder(
-                "ORD007", store2, null, OrderStatus.PENDING, "HIGH",
-                LocalDateTime.now().minusHours(6), LocalDate.now(),
-                "Đơn mới cần điều phối bếp", "storestaff", new BigDecimal("780000")
-        );
-        Order order8 = ensureOrder(
-                "ORD008", store2, kitchen2, OrderStatus.ASSIGNED, "NORMAL",
-                LocalDateTime.now().minusHours(10), LocalDate.now().plusDays(1),
-                "Đã phân bếp chi nhánh 2", "storestaff", new BigDecimal("460000")
-        );
-        Order order9 = ensureOrder(
-                "ORD009", store2, kitchen2, OrderStatus.SHIPPING, "HIGH",
-                LocalDateTime.now().minusDays(1), LocalDate.now(),
-                "Đang giao tuyến Q7", "storestaff", new BigDecimal("510000")
-        );
-        Order order10 = ensureOrder(
-                "ORD010", store2, kitchen2, OrderStatus.CANCELLED, "NORMAL",
-                LocalDateTime.now().minusDays(2), LocalDate.now().minusDays(1),
-                "Hủy do khách đổi kế hoạch", "storestaff", new BigDecimal("0")
-        );
-        Order order11 = ensureOrder(
-                "ORD011", store, kitchen, OrderStatus.IN_PROGRESS, "HIGH",
-                LocalDateTime.now().minusDays(2), LocalDate.now().minusDays(1),
-                "Đơn quá hạn cần theo dõi", "storestaff", new BigDecimal("670000")
-        );
-        Order order12 = ensureOrder(
-                "ORD012", store2, kitchen2, OrderStatus.DELIVERED, "LOW",
-                LocalDateTime.now().minusDays(5), LocalDate.now().minusDays(3),
-                "Đã hoàn tất giao nhận", "storestaff", new BigDecimal("250000")
-        );
+        if (seedOrdersEnabled) {
+            // ===== ORDERS =====
+            Order order1 = ensureOrder(
+                    "ORD001", store, kitchen, OrderStatus.PENDING, "HIGH",
+                    LocalDateTime.now().minusHours(4), LocalDate.now().plusDays(1),
+                    "Cần bổ sung gấp ngượi liệu", "storestaff", new BigDecimal("650000")
+            );
+            Order order2 = ensureOrder(
+                    "ORD002", store, kitchen, OrderStatus.IN_PROGRESS, "NORMAL",
+                    LocalDateTime.now().minusHours(8), LocalDate.now().plusDays(2),
+                    "Nhập hàng tuần", "storestaff", new BigDecimal("430000")
+            );
+            Order order3 = ensureOrder(
+                    "ORD003", store, kitchen, OrderStatus.ASSIGNED, "NORMAL",
+                    LocalDateTime.now().minusDays(1), LocalDate.now().plusDays(3),
+                    "Sự kiện cuối tuần", "storestaff", new BigDecimal("520000")
+            );
+            Order order4 = ensureOrder(
+                    "ORD004", store, kitchen, OrderStatus.SHIPPING, "HIGH",
+                    LocalDateTime.now().minusDays(2), LocalDate.now(),
+                    "Giao hôm nay", "storestaff", new BigDecimal("310000")
+            );
+            Order order5 = ensureOrder(
+                    "ORD005", store, kitchen, OrderStatus.DELIVERED, "NORMAL",
+                    LocalDateTime.now().minusDays(3), LocalDate.now().minusDays(1),
+                    "Đã nhận 28/03", "storestaff", new BigDecimal("290000")
+            );
+            Order order6 = ensureOrder(
+                    "ORD006", store, kitchen, OrderStatus.CANCELLED, "LOW",
+                    LocalDateTime.now().minusDays(4), LocalDate.now().minusDays(2),
+                    "Hủy do hết sản phẩm", "storestaff", new BigDecimal("0")
+            );
+            Order order7 = ensureOrder(
+                    "ORD007", store2, null, OrderStatus.PENDING, "HIGH",
+                    LocalDateTime.now().minusHours(6), LocalDate.now(),
+                    "Đơn mới cần điều phối bếp", "storestaff", new BigDecimal("780000")
+            );
+            Order order8 = ensureOrder(
+                    "ORD008", store2, kitchen2, OrderStatus.ASSIGNED, "NORMAL",
+                    LocalDateTime.now().minusHours(10), LocalDate.now().plusDays(1),
+                    "Đã phân bếp chi nhánh 2", "storestaff", new BigDecimal("460000")
+            );
+            Order order9 = ensureOrder(
+                    "ORD009", store2, kitchen2, OrderStatus.SHIPPING, "HIGH",
+                    LocalDateTime.now().minusDays(1), LocalDate.now(),
+                    "Đang giao tuyến Q7", "storestaff", new BigDecimal("510000")
+            );
+            Order order10 = ensureOrder(
+                    "ORD010", store2, kitchen2, OrderStatus.CANCELLED, "NORMAL",
+                    LocalDateTime.now().minusDays(2), LocalDate.now().minusDays(1),
+                    "Hủy do khách đổi kế hoạch", "storestaff", new BigDecimal("0")
+            );
+            Order order11 = ensureOrder(
+                    "ORD011", store, kitchen, OrderStatus.IN_PROGRESS, "HIGH",
+                    LocalDateTime.now().minusDays(2), LocalDate.now().minusDays(1),
+                    "Đơn quá hạn cần theo dõi", "storestaff", new BigDecimal("670000")
+            );
+            Order order12 = ensureOrder(
+                    "ORD012", store2, kitchen2, OrderStatus.DELIVERED, "LOW",
+                    LocalDateTime.now().minusDays(5), LocalDate.now().minusDays(3),
+                    "Đã hoàn tất giao nhận", "storestaff", new BigDecimal("250000")
+            );
 
-        // ===== ORDER ITEMS =====
-        ensureOrderItem(order1, product1, 50, "piece");
-        ensureOrderItem(order1, product2, 30, "piece");
-        ensureOrderItem(order2, product1, 40, "piece");
-        ensureOrderItem(order2, product2, 20, "piece");
-        ensureOrderItem(order3, product1, 60, "piece");
-        ensureOrderItem(order3, product2, 25, "piece");
-        ensureOrderItem(order4, product2, 35, "piece");
-        ensureOrderItem(order5, product1, 30, "piece");
-        ensureOrderItem(order5, product2, 15, "piece");
-        ensureOrderItem(order6, product1, 10, "piece");
-        ensureOrderItem(order7, product1, 45, "piece");
-        ensureOrderItem(order7, product2, 18, "piece");
-        ensureOrderItem(order8, product1, 28, "piece");
-        ensureOrderItem(order8, product2, 22, "piece");
-        ensureOrderItem(order9, product1, 35, "piece");
-        ensureOrderItem(order10, product2, 16, "piece");
-        ensureOrderItem(order11, product1, 42, "piece");
-        ensureOrderItem(order11, product2, 27, "piece");
-        ensureOrderItem(order12, product2, 14, "piece");
+            // ===== ORDER ITEMS =====
+            ensureOrderItem(order1, product1, 50, "piece");
+            ensureOrderItem(order1, product2, 30, "piece");
+            ensureOrderItem(order2, product1, 40, "piece");
+            ensureOrderItem(order2, product2, 20, "piece");
+            ensureOrderItem(order3, product1, 60, "piece");
+            ensureOrderItem(order3, product2, 25, "piece");
+            ensureOrderItem(order4, product2, 35, "piece");
+            ensureOrderItem(order5, product1, 30, "piece");
+            ensureOrderItem(order5, product2, 15, "piece");
+            ensureOrderItem(order6, product1, 10, "piece");
+            ensureOrderItem(order7, product1, 45, "piece");
+            ensureOrderItem(order7, product2, 18, "piece");
+            ensureOrderItem(order8, product1, 28, "piece");
+            ensureOrderItem(order8, product2, 22, "piece");
+            ensureOrderItem(order9, product1, 35, "piece");
+            ensureOrderItem(order10, product2, 16, "piece");
+            ensureOrderItem(order11, product1, 42, "piece");
+            ensureOrderItem(order11, product2, 27, "piece");
+            ensureOrderItem(order12, product2, 14, "piece");
 
-        ensureBatch(
-                "BATCH001", order1, 1, plan1, product1, kitchen,
-                80, "cai", "IN_PROGRESS", LocalDateTime.now().minusHours(1), null,
-                "kitchen"
-        );
+            // ===== DELIVERIES =====
+            User coordinator = userRepository.findByUsername("supply")
+                    .orElseThrow(() -> new IllegalStateException("Supply coordinator user not found"));
+
+            ensureDelivery("DEL001", order3, coordinator, "ASSIGNED", LocalDateTime.now().minusHours(2));
+            ensureDelivery("DEL002", order4, coordinator, "SHIPPING", LocalDateTime.now().minusDays(1));
+            ensureDelivery("DEL003", order5, coordinator, "DELIVERED", LocalDateTime.now().minusDays(2));
+            ensureDelivery("DEL004", order8, coordinator, "ASSIGNED", LocalDateTime.now().minusHours(5));
+            ensureDelivery("DEL005", order9, coordinator, "DELAYED", LocalDateTime.now().minusHours(20));
+            ensureDelivery("DEL006", order10, coordinator, "CANCELLED", LocalDateTime.now().minusHours(30));
+            ensureDelivery("DEL007", order12, coordinator, "DELIVERED", LocalDateTime.now().minusDays(4));
+
+            ensureBatch(
+                    "BATCH001", order1, 1, plan1, product1, kitchen,
+                    80, "cai", "IN_PROGRESS", LocalDateTime.now().minusHours(1), null,
+                    "kitchen"
+            );
+        } else {
+            log.info("Skipping order/delivery seed data (app.seed.orders.enabled=false)");
+        }
 
         ensureKitchenInventories(ingredient1, ingredient2);
         ensureStoreInventories(store, product1, product2);
         ensureInventoryDisposals();
-
-        // ===== DELIVERIES =====
-        User coordinator = userRepository.findByUsername("supply")
-                .orElseThrow(() -> new IllegalStateException("Supply coordinator user not found"));
-
-        ensureDelivery("DEL001", order3, coordinator, "ASSIGNED", LocalDateTime.now().minusHours(2));
-        ensureDelivery("DEL002", order4, coordinator, "SHIPPING", LocalDateTime.now().minusDays(1));
-        ensureDelivery("DEL003", order5, coordinator, "DELIVERED", LocalDateTime.now().minusDays(2));
-                ensureDelivery("DEL004", order8, coordinator, "ASSIGNED", LocalDateTime.now().minusHours(5));
-                ensureDelivery("DEL005", order9, coordinator, "DELAYED", LocalDateTime.now().minusHours(20));
-                ensureDelivery("DEL006", order10, coordinator, "CANCELLED", LocalDateTime.now().minusHours(30));
-                ensureDelivery("DEL007", order12, coordinator, "DELIVERED", LocalDateTime.now().minusDays(4));
 
         log.info("✅ Manager dashboard seed data ready");
     }

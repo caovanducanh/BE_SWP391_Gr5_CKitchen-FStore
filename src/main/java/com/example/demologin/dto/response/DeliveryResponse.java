@@ -11,9 +11,12 @@ public class DeliveryResponse {
     private String id;
     private String orderId;
     private String coordinatorName;
+    private String shipperName;
     private String status;
     private LocalDateTime assignedAt;
+    private LocalDateTime pickedUpAt;
     private LocalDateTime deliveredAt;
+    private String pickupQrCode;
     private String notes;
     private String receiverName;
     private Boolean temperatureOk;

@@ -112,8 +112,7 @@ public class SalesReportServiceImpl implements SalesReportService {
             }
             noteSheet.autoSizeColumn(0);
 
-            workbook.write(out);
-            return out.toByteArray();
+            return writeWorkbookToBytes(workbook, out);
         } catch (IOException ex) {
             throw new BusinessException("Cannot generate sales report template");
         }
@@ -184,7 +183,7 @@ public class SalesReportServiceImpl implements SalesReportService {
 
         for (ParsedSaleRow row : parsedRows) {
             StoreInventory inventory = inventoryByProduct.get(row.productId());
-            if (inventory != null && !inventory.getUnit().equalsIgnoreCase(row.unit())) {
+            if (!inventory.getUnit().equalsIgnoreCase(row.unit())) {
                 stockErrors.add("product_id " + row.productId() + " has unit '" + row.unit() + "' but inventory unit is '" + inventory.getUnit() + "'");
             }
         }
@@ -649,11 +648,15 @@ public class SalesReportServiceImpl implements SalesReportService {
                 detailsSheet.autoSizeColumn(i);
             }
 
-            workbook.write(out);
-            return out.toByteArray();
+            return writeWorkbookToBytes(workbook, out);
         } catch (IOException ex) {
             throw new BusinessException("Cannot export manager revenue report");
         }
+    }
+
+    byte[] writeWorkbookToBytes(Workbook workbook, ByteArrayOutputStream out) throws IOException {
+        workbook.write(out);
+        return out.toByteArray();
     }
 
     private List<ParsedSaleRow> parseExcelRows(MultipartFile file) {

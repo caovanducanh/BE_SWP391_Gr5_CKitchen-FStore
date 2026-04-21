@@ -98,10 +98,10 @@ public class FranchiseStoreController {
     @SecuredEndpoint("DELIVERY_VIEW")
     @Operation(
             summary = "Danh sách giao hàng của cửa hàng",
-            description = "Xem danh sách các lượt giao hàng liên quan tới cửa hàng hiện tại. Có thể lọc theo status (ASSIGNED, SHIPPING, DELIVERED)."
+            description = "Xem danh sách các lượt giao hàng liên quan tới cửa hàng hiện tại. Có thể lọc theo status (ASSIGNED, SHIPPING, WAITING_CONFIRM, DELIVERED)."
     )
     public Object getDeliveries(
-            @Parameter(description = "Delivery status filter (ASSIGNED, SHIPPING, DELIVERED)", example = "SHIPPING")
+            @Parameter(description = "Delivery status filter (ASSIGNED, SHIPPING, WAITING_CONFIRM, DELIVERED)", example = "SHIPPING")
             @RequestParam(required = false) String status,
             @Parameter(description = "Page index (0-based)", example = "0")
             @RequestParam(defaultValue = "0") int page,
@@ -127,6 +127,22 @@ public class FranchiseStoreController {
             @Valid @RequestBody ConfirmReceiptRequest request
     ) {
         return franchiseStoreService.confirmReceipt(deliveryId, request);
+    }
+
+    @PostMapping("/orders/{orderId}/confirm-receipt")
+    @ApiResponse(message = "Receipt confirmed successfully")
+    @SecuredEndpoint("DELIVERY_CONFIRM")
+    @Operation(
+            summary = "Xác nhận nhận hàng theo đơn",
+            description = "Store staff xác nhận đã nhận hàng ngay tại màn chi tiết đơn (order). " +
+                    "Hệ thống tự tìm delivery của order và cập nhật trạng thái delivery/order thành DELIVERED."
+    )
+    public Object confirmReceiptByOrder(
+            @PathVariable String orderId,
+            @Valid @RequestBody ConfirmReceiptRequest request,
+            Principal principal
+    ) {
+        return franchiseStoreService.confirmReceiptByOrderId(orderId, request, principal);
     }
 
     // ==================== Store Inventory ====================

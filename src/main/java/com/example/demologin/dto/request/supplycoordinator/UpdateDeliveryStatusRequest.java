@@ -8,7 +8,7 @@ import lombok.Getter;
 public class UpdateDeliveryStatusRequest {
 
     @NotBlank(message = "status is required")
-    @Schema(description = "Delivery status", allowableValues = {"ASSIGNED", "SHIPPING", "DELAYED", "DELIVERED", "CANCELLED"})
+    @Schema(description = "Delivery status", allowableValues = {"ASSIGNED", "SHIPPING", "DELAYED", "WAITING_CONFIRM", "DELIVERED", "CANCELLED"})
     private String status;
 
     @Schema(description = "Optional note from coordinator", requiredMode = Schema.RequiredMode.NOT_REQUIRED, nullable = true)

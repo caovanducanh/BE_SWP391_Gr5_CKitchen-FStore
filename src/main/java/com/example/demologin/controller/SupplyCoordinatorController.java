@@ -152,6 +152,28 @@ public class SupplyCoordinatorController {
         return supplyCoordinatorService.updateDeliveryStatus(deliveryId, request, principal);
     }
 
+        @GetMapping("/orders/{orderId}/pickup-qr")
+        @ApiResponse(message = "Order pickup QR retrieved successfully")
+        @SecuredEndpoint("SUPPLY_DELIVERY_VIEW")
+        @Operation(
+                        summary = "Lấy mã QR để shipper nhận đơn",
+                        description = "Trả về mã QR của delivery theo order để điều phối viên đưa shipper quét nhận đơn nhanh."
+        )
+        public Object getOrderPickupQr(@PathVariable String orderId, Principal principal) {
+                return supplyCoordinatorService.getOrderPickupQr(orderId, principal);
+        }
+
+        @GetMapping("/orders/{orderId}/holder")
+        @ApiResponse(message = "Order holder retrieved successfully")
+        @SecuredEndpoint("SUPPLY_DELIVERY_VIEW")
+        @Operation(
+                        summary = "Xem ai đang cầm đơn",
+                        description = "Tra cứu shipper đang giữ đơn giao theo order để theo dõi trách nhiệm giao nhận."
+        )
+        public Object getOrderHolder(@PathVariable String orderId, Principal principal) {
+                return supplyCoordinatorService.getOrderHolder(orderId, principal);
+        }
+
     @PostMapping("/orders/{orderId}/issues")
     @ApiResponse(message = "Issue handled successfully")
     @SecuredEndpoint("SUPPLY_ISSUE_MANAGE")

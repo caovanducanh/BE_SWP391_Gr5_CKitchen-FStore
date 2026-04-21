@@ -5,7 +5,9 @@ import com.example.demologin.dto.request.supplycoordinator.HandleIssueRequest;
 import com.example.demologin.dto.request.supplycoordinator.ScheduleDeliveryRequest;
 import com.example.demologin.dto.request.supplycoordinator.UpdateDeliveryStatusRequest;
 import com.example.demologin.dto.response.DeliveryResponse;
+import com.example.demologin.dto.response.OrderHolderResponse;
 import com.example.demologin.dto.response.OrderItemResponse;
+import com.example.demologin.dto.response.OrderPickupQrResponse;
 import com.example.demologin.dto.response.OrderResponse;
 import com.example.demologin.dto.response.SupplyCoordinatorOverviewResponse;
 import com.example.demologin.entity.Delivery;
@@ -38,6 +40,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -50,6 +53,7 @@ public class SupplyCoordinatorServiceImpl implements SupplyCoordinatorService {
             "ASSIGNED",
             "SHIPPING",
             "DELAYED",
+            "WAITING_CONFIRM",
             "DELIVERED",
             "CANCELLED"
     );
@@ -249,6 +253,7 @@ public class SupplyCoordinatorServiceImpl implements SupplyCoordinatorService {
                 .coordinator(coordinator)
                 .status(deliveryStatus)
                 .assignedAt(assignedAt)
+            .pickupQrCode(generatePickupQrCode(order.getId()))
                 .notes(normalizeText(request.getNotes()))
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -375,6 +380,64 @@ public class SupplyCoordinatorServiceImpl implements SupplyCoordinatorService {
         orderRepository.save(order);
         return toDeliveryResponse(deliveryRepository.save(delivery));
     }
+
+        @Override
+        public OrderPickupQrResponse getOrderPickupQr(String orderId, Principal principal) {
+            User coordinator = getCurrentSupplyCoordinator(principal);
+
+        Order order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
+
+            Delivery delivery = deliveryRepository.findByOrder_Id(orderId).orElse(null);
+
+            if (delivery == null) {
+                if (order.getStatus() != OrderStatus.PACKED_WAITING_SHIPPER && order.getStatus() != OrderStatus.SHIPPING) {
+                    throw new BadRequestException("Cannot generate pickup QR when order status is " + order.getStatus());
+                }
+
+                LocalDateTime now = LocalDateTime.now();
+                String deliveryStatus = order.getStatus() == OrderStatus.SHIPPING ? "SHIPPING" : "ASSIGNED";
+
+                delivery = Delivery.builder()
+                        .id(generateDeliveryId())
+                        .order(order)
+                        .coordinator(coordinator)
+                        .status(deliveryStatus)
+                        .assignedAt(now)
+                        .pickupQrCode(generatePickupQrCode(orderId))
+                        .createdAt(now)
+                        .updatedAt(now)
+                        .build();
+
+                delivery = deliveryRepository.save(delivery);
+            }
+
+        if (delivery.getPickupQrCode() == null || delivery.getPickupQrCode().isBlank()) {
+            delivery.setPickupQrCode(generatePickupQrCode(orderId));
+            delivery.setUpdatedAt(LocalDateTime.now());
+            delivery = deliveryRepository.save(delivery);
+        }
+
+        return OrderPickupQrResponse.builder()
+            .orderId(order.getId())
+            .deliveryId(delivery.getId())
+            .pickupQrCode(delivery.getPickupQrCode())
+            .deliveryStatus(delivery.getStatus())
+            .build();
+        }
+
+        @Override
+        public OrderHolderResponse getOrderHolder(String orderId, Principal principal) {
+        validateSupplyCoordinator(principal);
+
+        Order order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
+
+        Delivery delivery = deliveryRepository.findByOrder_Id(orderId)
+            .orElseThrow(() -> new NotFoundException("Delivery not found for order: " + orderId));
+
+        return toOrderHolderResponse(order, delivery);
+        }
 
     @Override
     @Transactional
@@ -540,6 +603,10 @@ public class SupplyCoordinatorServiceImpl implements SupplyCoordinatorService {
         return String.format("DEL%s%03d", datePart, count % 1000);
     }
 
+    private String generatePickupQrCode(String orderId) {
+        return "PK-" + orderId + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
     private OrderResponse toOrderResponse(Order order, List<OrderItem> items) {
         List<OrderItemResponse> itemResponses = items.stream().map(i -> OrderItemResponse.builder()
                 .id(i.getId())
@@ -575,14 +642,32 @@ public class SupplyCoordinatorServiceImpl implements SupplyCoordinatorService {
                 .id(delivery.getId())
                 .orderId(delivery.getOrder().getId())
                 .coordinatorName(delivery.getCoordinator() != null ? delivery.getCoordinator().getFullName() : null)
+                .shipperName(delivery.getShipper() != null ? delivery.getShipper().getFullName() : null)
                 .status(delivery.getStatus())
                 .assignedAt(delivery.getAssignedAt())
+                .pickedUpAt(delivery.getPickedUpAt())
                 .deliveredAt(delivery.getDeliveredAt())
+                .pickupQrCode(delivery.getPickupQrCode())
                 .notes(delivery.getNotes())
                 .receiverName(delivery.getReceiverName())
                 .temperatureOk(delivery.getTemperatureOk())
                 .createdAt(delivery.getCreatedAt())
                 .updatedAt(delivery.getUpdatedAt())
+                .build();
+    }
+
+    private OrderHolderResponse toOrderHolderResponse(Order order, Delivery delivery) {
+        User holder = delivery.getShipper();
+        return OrderHolderResponse.builder()
+                .orderId(order.getId())
+                .deliveryId(delivery.getId())
+                .orderStatus(order.getStatus())
+                .deliveryStatus(delivery.getStatus())
+                .pickupQrCode(delivery.getPickupQrCode())
+                .holderUserId(holder != null ? holder.getUserId() : null)
+                .holderUsername(holder != null ? holder.getUsername() : null)
+                .holderFullName(holder != null ? holder.getFullName() : null)
+                .pickedUpAt(delivery.getPickedUpAt())
                 .build();
     }
 }

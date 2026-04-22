@@ -8,6 +8,7 @@ import com.example.demologin.dto.response.DeliveryResponse;
 import com.example.demologin.dto.response.OrderHolderResponse;
 import com.example.demologin.dto.response.OrderPickupQrResponse;
 import com.example.demologin.dto.response.OrderResponse;
+import com.example.demologin.dto.response.KitchenResponse;
 import com.example.demologin.dto.response.SupplyCoordinatorOverviewResponse;
 import org.springframework.data.domain.Page;
 
@@ -16,6 +17,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface SupplyCoordinatorService {
+    Page<KitchenResponse> getKitchens(int page, int size, Principal principal);
+
     Page<OrderResponse> getOrders(String status,
                                   String priority,
                                   String storeId,

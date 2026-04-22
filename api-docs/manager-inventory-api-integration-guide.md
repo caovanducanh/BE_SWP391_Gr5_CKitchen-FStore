@@ -282,3 +282,163 @@ Luu y: endpoint duoc bao ve boi `@SecuredEndpoint`, thieu quyen se tra `403`.
 - [ ] Khong hardcode unit tay; luon lay unit tu `/ingredients`.
 - [ ] Payload create/update khong gui field `unit`.
 - [ ] Xu ly 404 cho kitchen/ingredient/inventory khong ton tai.
+
+---
+
+## 8) API Support Matrix theo Tung Tac Vu FE
+
+Bang nay tra loi truc tiep: "manager can goi API nao de ho tro create/update/filter/quan ly?"
+
+| Tac vu FE | API can goi | Bat buoc/Optional | Muc dich |
+|---|---|---|---|
+| Load trang manager inventory | `GET /api/manager/inventory/kitchens` | Bat buoc | Lay dropdown kitchen filter |
+| Load trang manager inventory | `GET /api/manager/inventory/ingredients` | Bat buoc | Lay ingredient + unit chuan cho form create/update |
+| Load trang manager inventory | `GET /api/manager/inventory/suppliers` | Optional | Lay danh sach supplier de filter UI |
+| Load grid mac dinh | `GET /api/manager/inventory/kitchen?page=0&size=20` | Bat buoc | Lay data grid dang grouped theo kitchen |
+| Filter theo kitchen | `GET /api/manager/inventory/kitchen?kitchenId=KIT001&page=0&size=20` | Bat buoc neu co kitchen filter | Loc du lieu theo kitchen |
+| Filter low stock | `GET /api/manager/inventory/kitchen?lowStock=true&page=0&size=20` | Optional | Loc item sap can bo sung |
+| Create item | `POST /api/manager/inventory/kitchen` | Bat buoc | Tao item ton kho moi |
+| Update item | `PUT /api/manager/inventory/kitchen/{id}` | Bat buoc | Cap nhat item ton kho |
+| Delete item | `DELETE /api/manager/inventory/kitchen/{id}` | Bat buoc | Xoa item ton kho |
+| Refresh grid sau create/update/delete | Goi lai `GET /api/manager/inventory/kitchen?...` theo filter hien tai | Bat buoc | Dong bo UI voi du lieu moi |
+
+---
+
+## 9) Call Flow Chuan Cho Tung Chuc Nang
+
+## 9.1 Flow Load Trang
+
+1. Goi song song:
+   - `GET /api/manager/inventory/kitchens`
+   - `GET /api/manager/inventory/ingredients`
+   - `GET /api/manager/inventory/suppliers` (neu UI co supplier filter)
+2. Goi grid lan dau:
+   - `GET /api/manager/inventory/kitchen?page=0&size=20`
+
+Ket qua mong doi:
+- Dropdown kitchen co du lieu
+- Dropdown ingredient co `id/name/unit`
+- Grid ton kho render theo nhom kitchen -> items
+
+## 9.2 Flow Create Item Ton Kho
+
+API ho tro bat buoc truoc khi bam Save:
+- `GET /api/manager/inventory/kitchens`
+- `GET /api/manager/inventory/ingredients`
+
+Thu tu xu ly FE:
+1. User chon `kitchenId` tu dropdown kitchen.
+2. User chon `ingredientId` tu dropdown ingredient.
+3. FE hien thi unit read-only theo ingredient da chon (`unit` lay tu API ingredients).
+4. FE submit:
+
+```json
+POST /api/manager/inventory/kitchen
+{
+  "kitchenId": "KIT001",
+  "ingredientId": "ING001",
+  "quantity": 25,
+  "minStock": 10,
+  "batchNo": "BATCH-APR-001",
+  "expiryDate": "2026-05-15",
+  "supplier": "ABC Supplier"
+}
+```
+
+5. Sau khi 200, FE goi lai grid theo filter hien tai:
+   - `GET /api/manager/inventory/kitchen?...`
+
+Luu y:
+- Khong gui field `unit` trong payload create.
+- Neu gui kitchenId/ingredientId khong ton tai -> 404.
+
+## 9.3 Flow Update Item Ton Kho
+
+API ho tro bat buoc:
+- `GET /api/manager/inventory/ingredients` de cap nhat dropdown ingredient va unit chuan.
+
+Thu tu xu ly FE:
+1. Tu item tren grid lay `id` de update.
+2. User chinh sua cac truong cho phep: kitchen, ingredient, quantity, minStock, batchNo, expiryDate, supplier.
+3. FE submit:
+
+```json
+PUT /api/manager/inventory/kitchen/{id}
+{
+  "kitchenId": "KIT001",
+  "ingredientId": "ING002",
+  "quantity": 18,
+  "minStock": 8,
+  "batchNo": "BATCH-APR-002",
+  "expiryDate": "2026-06-01",
+  "supplier": "ABC Supplier"
+}
+```
+
+4. Sau khi 200, goi lai list:
+   - `GET /api/manager/inventory/kitchen?...`
+
+Luu y:
+- Khong gui field `unit` trong payload update.
+- Neu `{id}` khong ton tai -> 404 Kitchen inventory not found.
+
+## 9.4 Flow Delete Item
+
+Thu tu xu ly FE:
+1. User bam delete tren item co `id`.
+2. Goi:
+   - `DELETE /api/manager/inventory/kitchen/{id}`
+3. Sau khi 200, refresh list:
+   - `GET /api/manager/inventory/kitchen?...`
+
+## 9.5 Flow Filter
+
+Manager inventory list hien chi support filter:
+- `kitchenId`
+- `lowStock`
+- `page`, `size`
+
+Vi du:
+- Theo kitchen: `GET /api/manager/inventory/kitchen?kitchenId=KIT001&page=0&size=20`
+- Theo low stock: `GET /api/manager/inventory/kitchen?lowStock=true&page=0&size=20`
+- Ket hop: `GET /api/manager/inventory/kitchen?kitchenId=KIT001&lowStock=true&page=0&size=20`
+
+Luu y quan trong:
+- API list hien KHONG support query `ingredientId`, `ingredientName`, `supplier`.
+- Neu FE muon loc UI theo ingredient/supplier thi can loc client-side tren du lieu `items[]` sau khi nhan response.
+
+---
+
+## 10) Payload Contract Cho Form Create/Update
+
+`KitchenInventoryUpsertRequest` chinh xac hien tai:
+
+```json
+{
+  "kitchenId": "string (required, max 10)",
+  "ingredientId": "string (required, max 10)",
+  "quantity": "number >= 0 (required)",
+  "minStock": "integer >= 0 (required)",
+  "batchNo": "string (optional, max 30)",
+  "expiryDate": "yyyy-MM-dd (optional)",
+  "supplier": "string (optional, max 100)"
+}
+```
+
+Khong co field `unit` trong request.
+
+---
+
+## 11) FE Error Handling Nhanh
+
+- `400`:
+  - Loi validate input (`quantity`, `minStock`, max length, ...)
+- `403`:
+  - Thieu permission (`INVENTORY_VIEW` hoac `INVENTORY_MANAGE`)
+- `404`:
+  - Kitchen/Ingredient/Inventory item khong ton tai
+
+Khuyen nghi UX:
+1. Neu `403`: hien thong bao "Ban khong co quyen thao tac ton kho".
+2. Neu `404` sau khi update/delete: dong modal + refresh list de tranh stale data.
+3. Neu `400`: hien loi ngay duoi field theo message backend.

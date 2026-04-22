@@ -5,6 +5,7 @@ import com.example.demologin.dto.request.supplycoordinator.HandleIssueRequest;
 import com.example.demologin.dto.request.supplycoordinator.ScheduleDeliveryRequest;
 import com.example.demologin.dto.request.supplycoordinator.UpdateDeliveryStatusRequest;
 import com.example.demologin.dto.response.DeliveryResponse;
+import com.example.demologin.dto.response.KitchenResponse;
 import com.example.demologin.dto.response.OrderHolderResponse;
 import com.example.demologin.dto.response.OrderItemResponse;
 import com.example.demologin.dto.response.OrderPickupQrResponse;
@@ -85,6 +86,14 @@ public class SupplyCoordinatorServiceImpl implements SupplyCoordinatorService {
     private final KitchenRepository kitchenRepository;
     private final StoreRepository storeRepository;
     private final UserRepository userRepository;
+
+    @Override
+    public Page<KitchenResponse> getKitchens(int page, int size, Principal principal) {
+        validateSupplyCoordinator(principal);
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name"));
+        return kitchenRepository.findAll(pageRequest)
+                .map(this::toKitchenResponse);
+    }
 
     @Override
     public Page<OrderResponse> getOrders(String status,
@@ -653,6 +662,19 @@ public class SupplyCoordinatorServiceImpl implements SupplyCoordinatorService {
                 .temperatureOk(delivery.getTemperatureOk())
                 .createdAt(delivery.getCreatedAt())
                 .updatedAt(delivery.getUpdatedAt())
+                .build();
+    }
+
+    private KitchenResponse toKitchenResponse(Kitchen kitchen) {
+        return KitchenResponse.builder()
+                .id(kitchen.getId())
+                .name(kitchen.getName())
+                .address(kitchen.getAddress())
+                .phone(kitchen.getPhone())
+                .capacity(kitchen.getCapacity())
+                .status(kitchen.getStatus())
+                .createdAt(kitchen.getCreatedAt())
+                .updatedAt(kitchen.getUpdatedAt())
                 .build();
     }
 

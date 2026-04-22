@@ -199,7 +199,8 @@ public class ManagerDashboardDataInitializer {
             log.info("Skipping order/delivery seed data (app.seed.orders.enabled=false)");
         }
 
-        ensureKitchenInventories(ingredient1, ingredient2);
+        ensureKitchenInventories(kitchen, kitchen2, ingredient1, ingredient2);
+        backfillKitchenInventoryKitchen(kitchen);
         ensureStoreInventories(store, product1, product2);
         ensureInventoryDisposals();
 
@@ -433,13 +434,14 @@ public class ManagerDashboardDataInitializer {
         );
     }
 
-    private void ensureKitchenInventories(Ingredient ingredient1, Ingredient ingredient2) {
+        private void ensureKitchenInventories(Kitchen kitchen, Kitchen kitchen2, Ingredient ingredient1, Ingredient ingredient2) {
         if (kitchenInventoryRepository.count() > 0) {
             return;
         }
 
         kitchenInventoryRepository.saveAll(List.of(
                 KitchenInventory.builder()
+                                                .kitchen(kitchen)
                         .ingredient(ingredient1)
                         .quantity(new BigDecimal("4"))
                         .unit("kg")
@@ -449,6 +451,7 @@ public class ManagerDashboardDataInitializer {
                         .updatedAt(LocalDateTime.now())
                         .build(),
                 KitchenInventory.builder()
+                        .kitchen(kitchen2)
                         .ingredient(ingredient2)
                         .quantity(new BigDecimal("12"))
                         .unit("kg")
@@ -459,6 +462,17 @@ public class ManagerDashboardDataInitializer {
                         .build()
         ));
     }
+
+        private void backfillKitchenInventoryKitchen(Kitchen defaultKitchen) {
+                List<KitchenInventory> missingKitchenRows = kitchenInventoryRepository.findByKitchenIsNull();
+                if (missingKitchenRows.isEmpty()) {
+                        return;
+                }
+
+                missingKitchenRows.forEach(inv -> inv.setKitchen(defaultKitchen));
+                kitchenInventoryRepository.saveAll(missingKitchenRows);
+                log.info("✅ Backfilled {} kitchen_inventory rows with kitchen {}", missingKitchenRows.size(), defaultKitchen.getId());
+        }
 
     private void ensureStoreInventories(Store store, Product product1, Product product2) {
         if (storeInventoryRepository.count() > 0) {

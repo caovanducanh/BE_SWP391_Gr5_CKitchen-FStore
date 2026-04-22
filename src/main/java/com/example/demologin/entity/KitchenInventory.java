@@ -36,6 +36,10 @@ public class KitchenInventory {
     @JoinColumn(name = "ingredient_id", nullable = false)
     private Ingredient ingredient;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "kitchen_id")
+    private Kitchen kitchen;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal quantity;
 

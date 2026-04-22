@@ -1,13 +1,16 @@
 package com.example.demologin.dto.request.centralkitchen;
 
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
+@lombok.Setter
+@lombok.NoArgsConstructor
+@lombok.AllArgsConstructor
+@lombok.Builder
 public class CreateProductionPlanRequest {
 
     @NotBlank(message = "productId is required")
@@ -23,5 +26,7 @@ public class CreateProductionPlanRequest {
     @NotNull(message = "endDate is required")
     private LocalDateTime endDate;
 
+    /** Notes tuỳ chọn */
+    @Size(max = 500)
     private String notes;
 }

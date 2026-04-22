@@ -4,31 +4,31 @@ import com.example.demologin.entity.KitchenInventory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
-public interface KitchenInventoryRepository extends JpaRepository<KitchenInventory, Integer>, JpaSpecificationExecutor<KitchenInventory> {
+public interface KitchenInventoryRepository extends JpaRepository<KitchenInventory, Integer>,
+        JpaSpecificationExecutor<KitchenInventory> {
 
-    List<KitchenInventory> findByKitchenIsNull();
+    Optional<KitchenInventory> findByKitchen_IdAndIngredient_Id(String kitchenId, String ingredientId);
 
-    long countByKitchenIsNull();
+    boolean existsByKitchen_IdAndIngredient_Id(String kitchenId, String ingredientId);
 
-    boolean existsByKitchen_IdAndIngredient_IdAndBatchNo(String kitchenId, String ingredientId, String batchNo);
-
-    boolean existsByKitchen_IdAndIngredient_IdAndBatchNoIsNull(String kitchenId, String ingredientId);
-
-    boolean existsByKitchen_IdAndIngredient_IdAndBatchNoAndIdNot(String kitchenId, String ingredientId, String batchNo, Integer id);
-
-    boolean existsByKitchen_IdAndIngredient_IdAndBatchNoIsNullAndIdNot(String kitchenId, String ingredientId, Integer id);
-
-    @Query("select count(k) from KitchenInventory k where k.quantity <= k.minStock")
+    @Query("select count(k) from KitchenInventory k where k.totalQuantity <= k.minStock")
     long countLowStockItems();
 
-    @Query("select k from KitchenInventory k where k.quantity <= k.minStock order by k.quantity asc")
+    @Query("select k from KitchenInventory k where k.totalQuantity <= k.minStock order by k.totalQuantity asc")
     List<KitchenInventory> findLowStockItems();
 
-    @Query("select distinct k.supplier from KitchenInventory k where k.supplier is not null and trim(k.supplier) <> '' order by k.supplier asc")
-    List<String> findDistinctSuppliers();
+    List<KitchenInventory> findByKitchen_Id(String kitchenId);
+
+    @Query("""
+        select count(k) from KitchenInventory k
+        where k.kitchen.id = :kitchenId and k.totalQuantity <= k.minStock
+        """)
+    long countLowStockItemsByKitchenId(@Param("kitchenId") String kitchenId);
 }

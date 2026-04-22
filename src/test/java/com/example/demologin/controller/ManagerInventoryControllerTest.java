@@ -1,7 +1,6 @@
 package com.example.demologin.controller;
 
-import com.example.demologin.dto.request.manager.KitchenInventoryUpsertRequest;
-import com.example.demologin.dto.response.KitchenInventoryResponse;
+
 import com.example.demologin.dto.response.KitchenResponse;
 import com.example.demologin.dto.response.manager.IngredientFilterOptionResponse;
 import com.example.demologin.dto.response.manager.ManagerKitchenInventoryGroupResponse;
@@ -45,39 +44,7 @@ class ManagerInventoryControllerTest {
         verify(managerInventoryService).getKitchenInventory("KIT001", true, 0, 20);
     }
 
-    @Test
-    void createKitchenInventory() {
-        KitchenInventoryUpsertRequest request = new KitchenInventoryUpsertRequest();
-        KitchenInventoryResponse expectedResponse = KitchenInventoryResponse.builder().id(1).build();
-        when(managerInventoryService.createKitchenInventory(request)).thenReturn(expectedResponse);
 
-        Object result = controller.createKitchenInventory(request);
-
-        assertSame(expectedResponse, result);
-        verify(managerInventoryService).createKitchenInventory(request);
-    }
-
-    @Test
-    void updateKitchenInventory() {
-        KitchenInventoryUpsertRequest request = new KitchenInventoryUpsertRequest();
-        KitchenInventoryResponse expectedResponse = KitchenInventoryResponse.builder().id(1).build();
-        when(managerInventoryService.updateKitchenInventory(eq(1), any(KitchenInventoryUpsertRequest.class)))
-                .thenReturn(expectedResponse);
-
-        Object result = controller.updateKitchenInventory(1, request);
-
-        assertSame(expectedResponse, result);
-        verify(managerInventoryService).updateKitchenInventory(1, request);
-    }
-
-    @Test
-    void deleteKitchenInventory() {
-        doNothing().when(managerInventoryService).deleteKitchenInventory(1);
-
-        controller.deleteKitchenInventory(1);
-
-        verify(managerInventoryService).deleteKitchenInventory(1);
-    }
 
     @Test
     void getAllKitchens() {

@@ -1,7 +1,7 @@
 package com.example.demologin.serviceImpl;
 
 import com.example.demologin.dto.request.manager.KitchenInventoryUpsertRequest;
-import com.example.demologin.dto.response.KitchenInventoryResponse;
+
 import com.example.demologin.dto.response.KitchenResponse;
 import com.example.demologin.dto.response.manager.IngredientFilterOptionResponse;
 import com.example.demologin.dto.response.manager.ManagerKitchenInventoryGroupResponse;
@@ -72,63 +72,6 @@ public class ManagerInventoryServiceImpl implements ManagerInventoryService {
     }
 
     @Override
-    @Transactional
-    public KitchenInventoryResponse createKitchenInventory(KitchenInventoryUpsertRequest request) {
-        Kitchen kitchen = kitchenRepository.findById(request.getKitchenId().trim())
-            .orElseThrow(() -> new NotFoundException("Kitchen not found with id: " + request.getKitchenId()));
-
-        Ingredient ingredient = ingredientRepository.findById(request.getIngredientId().trim())
-                .orElseThrow(() -> new NotFoundException("Ingredient not found with id: " + request.getIngredientId()));
-
-        KitchenInventory saved = kitchenInventoryRepository.save(KitchenInventory.builder()
-            .kitchen(kitchen)
-                .ingredient(ingredient)
-                .quantity(request.getQuantity())
-            .unit(ingredient.getUnit())
-                .minStock(request.getMinStock())
-                .batchNo(normalizeText(request.getBatchNo()))
-                .expiryDate(request.getExpiryDate())
-                .supplier(normalizeText(request.getSupplier()))
-                .updatedAt(LocalDateTime.now())
-                .build());
-
-        return toKitchenInventoryResponse(saved);
-    }
-
-    @Override
-    @Transactional
-    public KitchenInventoryResponse updateKitchenInventory(Integer id, KitchenInventoryUpsertRequest request) {
-        KitchenInventory inventory = kitchenInventoryRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Kitchen inventory not found with id: " + id));
-
-        Kitchen kitchen = kitchenRepository.findById(request.getKitchenId().trim())
-            .orElseThrow(() -> new NotFoundException("Kitchen not found with id: " + request.getKitchenId()));
-
-        Ingredient ingredient = ingredientRepository.findById(request.getIngredientId().trim())
-                .orElseThrow(() -> new NotFoundException("Ingredient not found with id: " + request.getIngredientId()));
-
-        inventory.setKitchen(kitchen);
-        inventory.setIngredient(ingredient);
-        inventory.setQuantity(request.getQuantity());
-        inventory.setUnit(ingredient.getUnit());
-        inventory.setMinStock(request.getMinStock());
-        inventory.setBatchNo(normalizeText(request.getBatchNo()));
-        inventory.setExpiryDate(request.getExpiryDate());
-        inventory.setSupplier(normalizeText(request.getSupplier()));
-        inventory.setUpdatedAt(LocalDateTime.now());
-
-        return toKitchenInventoryResponse(kitchenInventoryRepository.save(inventory));
-    }
-
-    @Override
-    @Transactional
-    public void deleteKitchenInventory(Integer id) {
-        KitchenInventory inventory = kitchenInventoryRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Kitchen inventory not found with id: " + id));
-        kitchenInventoryRepository.delete(inventory);
-    }
-
-    @Override
     public List<KitchenResponse> getAllKitchens() {
         return kitchenRepository.findAll(Sort.by(Sort.Direction.ASC, "name")).stream()
                 .map(this::toKitchenResponse)
@@ -148,28 +91,10 @@ public class ManagerInventoryServiceImpl implements ManagerInventoryService {
 
     @Override
     public List<String> getAllSuppliersForFilter() {
-        return kitchenInventoryRepository.findDistinctSuppliers();
+        return List.of(); // Not tracked in KitchenInventory anymore
     }
 
-    private KitchenInventoryResponse toKitchenInventoryResponse(KitchenInventory inventory) {
-        return KitchenInventoryResponse.builder()
-                .id(inventory.getId())
-                .kitchenId(inventory.getKitchen() != null ? inventory.getKitchen().getId() : null)
-                .kitchenName(inventory.getKitchen() != null ? inventory.getKitchen().getName() : null)
-                .ingredientId(inventory.getIngredient().getId())
-                .ingredientName(inventory.getIngredient().getName())
-                .quantity(inventory.getQuantity())
-                .unit(inventory.getUnit())
-                .minStock(inventory.getMinStock())
-                .batchNo(inventory.getBatchNo())
-                .expiryDate(inventory.getExpiryDate())
-                .supplier(inventory.getSupplier())
-                .updatedAt(inventory.getUpdatedAt())
-                .lowStock(inventory.getQuantity() != null
-                        && inventory.getMinStock() != null
-                        && inventory.getQuantity().compareTo(BigDecimal.valueOf(inventory.getMinStock())) <= 0)
-                .build();
-    }
+
 
     private KitchenResponse toKitchenResponse(Kitchen kitchen) {
         return KitchenResponse.builder()
@@ -190,9 +115,9 @@ public class ManagerInventoryServiceImpl implements ManagerInventoryService {
             );
 
             if (Boolean.TRUE.equals(lowStock)) {
-                spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("quantity"), cb.toBigDecimal(root.get("minStock"))));
+                spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("totalQuantity"), cb.toBigDecimal(root.get("minStock"))));
             } else if (Boolean.FALSE.equals(lowStock)) {
-                spec = spec.and((root, query, cb) -> cb.greaterThan(root.get("quantity"), cb.toBigDecimal(root.get("minStock"))));
+                spec = spec.and((root, query, cb) -> cb.greaterThan(root.get("totalQuantity"), cb.toBigDecimal(root.get("minStock"))));
             }
 
             List<ManagerKitchenInventoryItemResponse> items = kitchenInventoryRepository
@@ -213,16 +138,13 @@ public class ManagerInventoryServiceImpl implements ManagerInventoryService {
                 .id(inventory.getId())
                 .ingredientId(inventory.getIngredient().getId())
                 .ingredientName(inventory.getIngredient().getName())
-                .quantity(inventory.getQuantity())
+                .totalQuantity(inventory.getTotalQuantity())
                 .unit(inventory.getUnit())
                 .minStock(inventory.getMinStock())
-                .batchNo(inventory.getBatchNo())
-                .expiryDate(inventory.getExpiryDate())
-                .supplier(inventory.getSupplier())
                 .updatedAt(inventory.getUpdatedAt())
-                .lowStock(inventory.getQuantity() != null
+                .lowStock(inventory.getTotalQuantity() != null
                     && inventory.getMinStock() != null
-                    && inventory.getQuantity().compareTo(BigDecimal.valueOf(inventory.getMinStock())) <= 0)
+                    && inventory.getTotalQuantity().compareTo(BigDecimal.valueOf(inventory.getMinStock())) <= 0)
                 .build();
             }
 

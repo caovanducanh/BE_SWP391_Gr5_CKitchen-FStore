@@ -3,6 +3,8 @@ package com.example.demologin.controller;
 import com.example.demologin.annotation.ApiResponse;
 import com.example.demologin.annotation.PageResponse;
 import com.example.demologin.annotation.SecuredEndpoint;
+import com.example.demologin.dto.request.centralkitchen.CompletePlanRequest;
+import com.example.demologin.dto.request.centralkitchen.CancelPlanRequest;
 import com.example.demologin.dto.request.centralkitchen.CreateProductionPlanRequest;
 import com.example.demologin.dto.request.centralkitchen.UpdateOrderStatusRequest;
 import com.example.demologin.service.CentralKitchenService;
@@ -128,20 +130,76 @@ public class CentralKitchenController {
     @SecuredEndpoint("KITCHEN_INVENTORY_VIEW")
     @Operation(
             summary = "Xem tồn kho nguyên liệu bếp",
-            description = "Xem nguyên liệu đầu vào, hạn dùng, số lô và cảnh báo thiếu hàng."
+            description = "Xem nguyên liệu đầu vào tổng hợp và chi tiết các lô hàng."
     )
     public Object getInventory(
             @Parameter(description = "Ingredient ID filter", example = "ING001")
             @RequestParam(required = false) String ingredientId,
             @Parameter(description = "Ingredient name filter", example = "Bột")
             @RequestParam(required = false) String ingredientName,
+            @Parameter(description = "Lọc sản phẩm sắp hết (<= minStock)")
+            @RequestParam(required = false) Boolean lowStock,
             @Parameter(description = "Page index (0-based)", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "20")
             @RequestParam(defaultValue = "20") int size,
             Principal principal
     ) {
-        return centralKitchenService.getInventory(ingredientId, ingredientName, page, size, principal);
+        return centralKitchenService.getInventory(ingredientId, ingredientName, lowStock, page, size, principal);
+    }
+    
+    @GetMapping("/production-plans/{planId}")
+    @ApiResponse(message = "Production plan retrieved successfully")
+    @SecuredEndpoint("PRODUCTION_PLAN_VIEW")
+    @Operation(summary = "Chi tiết kế hoạch sản xuất")
+    public Object getProductionPlanById(@PathVariable String planId, Principal principal) {
+        return centralKitchenService.getProductionPlanById(planId, principal);
+    }
+
+    @PatchMapping("/production-plans/{planId}/start")
+    @ApiResponse(message = "Production plan started successfully")
+    @SecuredEndpoint("PRODUCTION_PLAN_UPDATE")
+    @Operation(summary = "Bắt đầu sản xuất", description = "Chuyển kế hoạch sang IN_PRODUCTION và tự động trừ kho nguyên liệu (từ các lô đã tính toán).")
+    public Object startProductionPlan(@PathVariable String planId, Principal principal) {
+        return centralKitchenService.startProductionPlan(planId, principal);
+    }
+
+    @PatchMapping("/production-plans/{planId}/complete")
+    @ApiResponse(message = "Production plan completed successfully")
+    @SecuredEndpoint("PRODUCTION_PLAN_UPDATE")
+    @Operation(summary = "Hoàn thành sản xuất", description = "Chuyển kế hoạch sang COMPLETED, ghi nhận số lượng lô thành phẩm được sinh ra.")
+    public Object completeProductionPlan(@PathVariable String planId, @Valid @RequestBody CompletePlanRequest request, Principal principal) {
+        return centralKitchenService.completeProductionPlan(planId, request.getNotes(), request.getExpiryDate(), principal);
+    }
+
+    @PatchMapping("/production-plans/{planId}/cancel")
+    @ApiResponse(message = "Production plan cancelled successfully")
+    @SecuredEndpoint("PRODUCTION_PLAN_UPDATE")
+    @Operation(summary = "Hủy kế hoạch sản xuất", description = "Chuyển sang CANCELLED, nếu đang IN_PRODUCTION thì hoàn lại nguyên liệu.")
+    public Object cancelProductionPlan(@PathVariable String planId, @Valid @RequestBody CancelPlanRequest request, Principal principal) {
+        return centralKitchenService.cancelProductionPlan(planId, request.getNotes(), principal);
+    }
+    
+    @GetMapping("/product-batches")
+    @PageResponse
+    @ApiResponse(message = "Product batches retrieved successfully")
+    @SecuredEndpoint("PRODUCTION_PLAN_VIEW")
+    @Operation(summary = "Danh sách lô thành phẩm")
+    public Object getProductBatches(
+            @RequestParam(required = false) String productId,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Principal principal) {
+        return centralKitchenService.getProductBatches(productId, status, page, size, principal);
+    }
+
+    @GetMapping("/product-batches/{batchId}")
+    @ApiResponse(message = "Product batch retrieved successfully")
+    @SecuredEndpoint("PRODUCTION_PLAN_VIEW")
+    @Operation(summary = "Chi tiết lô thành phẩm", description = "Xem lô thành phẩm và traceability nguyên liệu cấu thành.")
+    public Object getProductBatchById(@PathVariable String batchId, Principal principal) {
+        return centralKitchenService.getProductBatchById(batchId, principal);
     }
 
     @GetMapping("/my-kitchen")

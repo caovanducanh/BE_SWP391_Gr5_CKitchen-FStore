@@ -13,12 +13,9 @@ public class ManagerKitchenInventoryItemResponse {
     private Integer id;
     private String ingredientId;
     private String ingredientName;
-    private BigDecimal quantity;
+    private BigDecimal totalQuantity;
     private String unit;
     private Integer minStock;
-    private String batchNo;
-    private LocalDate expiryDate;
-    private String supplier;
     private LocalDateTime updatedAt;
     private boolean lowStock;
 }

@@ -3,7 +3,7 @@ package com.example.demologin.controller;
 import com.example.demologin.dto.request.centralkitchen.CreateProductionPlanRequest;
 import com.example.demologin.dto.request.centralkitchen.UpdateOrderStatusRequest;
 import com.example.demologin.dto.response.CentralKitchenOverviewResponse;
-import com.example.demologin.dto.response.KitchenInventoryResponse;
+import com.example.demologin.dto.response.KitchenInventoryDetailResponse;
 import com.example.demologin.dto.response.KitchenResponse;
 import com.example.demologin.dto.response.OrderResponse;
 import com.example.demologin.dto.response.ProductionPlanResponse;
@@ -116,13 +116,13 @@ class CentralKitchenControllerTest {
     @Test
     void getInventory_shouldInvokeService() {
         Principal principal = mock(Principal.class);
-        Page<KitchenInventoryResponse> page = new PageImpl<>(List.of());
-        when(centralKitchenService.getInventory("ING001", "Bột", 0, 20, principal)).thenReturn(page);
+        Page<KitchenInventoryDetailResponse> page = new PageImpl<>(List.of());
+        when(centralKitchenService.getInventory("ING001", "Bột", false, 0, 20, principal)).thenReturn(page);
 
-        Object result = controller.getInventory("ING001", "Bột", 0, 20, principal);
+        Object result = controller.getInventory("ING001", "Bột", false, 0, 20, principal);
 
         assertSame(page, result);
-        verify(centralKitchenService).getInventory("ING001", "Bột", 0, 20, principal);
+        verify(centralKitchenService).getInventory("ING001", "Bột", false, 0, 20, principal);
     }
 
     @Test

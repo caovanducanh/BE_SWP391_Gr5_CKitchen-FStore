@@ -6,14 +6,18 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * Tracks how much of each ingredient_batch was consumed by a production plan.
+ * Enables full FEFO traceability: "plan X used ingredient batch Y (qty Z)".
+ */
 @Entity
-@Table(name = "plan_ingredients")
+@Table(name = "plan_ingredient_batch_usage")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PlanIngredient {
+public class PlanIngredientBatchUsage {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,15 +28,11 @@ public class PlanIngredient {
     private ProductionPlan plan;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "ingredient_id", nullable = false)
-    private Ingredient ingredient;
+    @JoinColumn(name = "ingredient_batch_id", nullable = false)
+    private IngredientBatch ingredientBatch;
 
-    /** Số lượng nguyên liệu cần cho kế hoạch này (= recipe.quantity * plan.quantity) */
-    @Column(nullable = false, precision = 10, scale = 4)
-    private BigDecimal quantity;
-
-    @Column(nullable = false, length = 20)
-    private String unit;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal quantityUsed;
 
     private LocalDateTime createdAt;
 }

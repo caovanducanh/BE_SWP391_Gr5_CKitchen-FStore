@@ -115,12 +115,22 @@ Nếu sai rule sẽ nhận lỗi:
 3. Danh sách đơn cần xử lý: `GET /api/central-kitchen/orders`.
 4. Nhấn “tiếp nhận đơn”: `PATCH /api/central-kitchen/orders/{orderId}/assign`.
 5. Cập nhật trạng thái theo tiến trình: `PATCH /api/central-kitchen/orders/{orderId}/status`.
-6. Quản lý kế hoạch sản xuất:
-   - list: `GET /api/central-kitchen/production-plans`
-   - tạo: `POST /api/central-kitchen/production-plans`
-7. Theo dõi tồn kho nguyên liệu: `GET /api/central-kitchen/inventory`.
-8. Xem thông tin bếp hiện tại: `GET /api/central-kitchen/my-kitchen`.
-9. Xem danh sách cửa hàng để điều phối: `GET /api/central-kitchen/stores`.
+6. Nhập lô nguyên liệu: `POST /api/central-kitchen/ingredient-batches`.
+7. Theo dõi lô nguyên liệu + tồn kho tổng hợp:
+  - `GET /api/central-kitchen/ingredient-batches`
+  - `GET /api/central-kitchen/inventory`
+8. Quản lý kế hoạch sản xuất:
+  - list: `GET /api/central-kitchen/production-plans`
+  - detail: `GET /api/central-kitchen/production-plans/{planId}`
+  - tạo: `POST /api/central-kitchen/production-plans`
+  - bắt đầu: `PATCH /api/central-kitchen/production-plans/{planId}/start`
+  - hoàn tất: `PATCH /api/central-kitchen/production-plans/{planId}/complete`
+  - hủy: `PATCH /api/central-kitchen/production-plans/{planId}/cancel`
+9. Theo dõi lô thành phẩm:
+  - `GET /api/central-kitchen/product-batches`
+  - `GET /api/central-kitchen/product-batches/{batchId}`
+10. Xem thông tin bếp hiện tại: `GET /api/central-kitchen/my-kitchen`.
+11. Xem danh sách cửa hàng để điều phối: `GET /api/central-kitchen/stores`.
 
 ---
 
@@ -259,6 +269,8 @@ Nếu sai rule sẽ nhận lỗi:
 - `id`
 - `productId`
 - `productName`
+- `kitchenId`
+- `kitchenName`
 - `quantity`
 - `unit`
 - `status`
@@ -268,10 +280,34 @@ Nếu sai rule sẽ nhận lỗi:
 - `notes`
 - `createdAt`
 - `updatedAt`
+- `ingredients` *(có thể có, đặc biệt khi gọi detail)*
 
 ---
 
-## 5.7) Tạo kế hoạch sản xuất
+## 5.7) Chi tiết kế hoạch sản xuất
+
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/production-plans/{planId}`
+- **Permission**: `PRODUCTION_PLAN_VIEW`
+
+### Response
+`data` là `ProductionPlanResponse`.
+
+Trong response detail, `ingredients` gồm:
+- `ingredientId`
+- `ingredientName`
+- `requiredQuantity`
+- `availableQuantity`
+- `unit`
+- `sufficient`
+
+### Lỗi thường gặp
+- `404 Production plan not found: {planId}`
+- `400 Plan does not belong to your kitchen`
+
+---
+
+## 5.8) Tạo kế hoạch sản xuất
 
 - **Method**: `POST`
 - **URL**: `/api/central-kitchen/production-plans`
@@ -296,7 +332,7 @@ Nếu sai rule sẽ nhận lỗi:
 - Rule nghiệp vụ: `endDate` phải sau `startDate`
 
 ### Response
-`data` là `ProductionPlanResponse` vừa tạo (`status` mặc định backend là `PLANNED`).
+`data` là `ProductionPlanResponse` vừa tạo (`status` mặc định backend là `DRAFT`).
 
 ### Lỗi thường gặp
 - `400 endDate must be after startDate`
@@ -304,7 +340,159 @@ Nếu sai rule sẽ nhận lỗi:
 
 ---
 
-## 5.8) Xem tồn kho nguyên liệu bếp
+---
+
+## 5.9) Bắt đầu kế hoạch sản xuất (trừ kho thực tế)
+
+- **Method**: `PATCH`
+- **URL**: `/api/central-kitchen/production-plans/{planId}/start`
+- **Permission**: `PRODUCTION_PLAN_UPDATE`
+- **Body**: không có
+
+### Rule nghiệp vụ
+- Chỉ được start khi plan đang `DRAFT` hoặc `APPROVED`.
+- Nếu tồn kho thực tế tại lô đã thay đổi, backend có thể từ chối và yêu cầu tạo lại plan.
+
+### Lỗi thường gặp
+- `404 Plan not found: {planId}`
+- `400 Can only start DRAFT or APPROVED plans`
+- `400 Batch <batchNo> does not have enough qty now. Please recreate plan.`
+
+---
+
+## 5.10) Hoàn tất kế hoạch sản xuất (tạo lô thành phẩm)
+
+- **Method**: `PATCH`
+- **URL**: `/api/central-kitchen/production-plans/{planId}/complete`
+- **Permission**: `PRODUCTION_PLAN_UPDATE`
+- **Body**:
+
+```json
+{
+  "notes": "Hoàn tất ca sáng",
+  "expiryDate": "2026-04-30"
+}
+```
+
+### Rule nghiệp vụ
+- Chỉ complete khi plan đang `IN_PRODUCTION`.
+- `expiryDate` bắt buộc.
+- Backend tự tạo lô thành phẩm mới với status `AVAILABLE`.
+
+### Lỗi thường gặp
+- `404 Plan not found: {planId}`
+- `400 Plan is not in production`
+- `400 expiryDate is required for the finished product batch`
+
+---
+
+## 5.11) Hủy kế hoạch sản xuất
+
+- **Method**: `PATCH`
+- **URL**: `/api/central-kitchen/production-plans/{planId}/cancel`
+- **Permission**: `PRODUCTION_PLAN_UPDATE`
+- **Body**:
+
+```json
+{
+  "notes": "Hủy do đổi kế hoạch"
+}
+```
+
+### Rule nghiệp vụ
+- Không thể hủy plan đã `COMPLETED`.
+- Nếu plan đang `IN_PRODUCTION`, backend tự hoàn trả nguyên liệu đã trừ về đúng lô ban đầu.
+
+### Lỗi thường gặp
+- `404 Plan not found: {planId}`
+- `400 Cannot cancel completed plan`
+
+---
+
+## 5.12) Nhập lô nguyên liệu mới
+
+- **Method**: `POST`
+- **URL**: `/api/central-kitchen/ingredient-batches`
+- **Permission**: `KITCHEN_INVENTORY_CREATE`
+- **Body**:
+
+```json
+{
+  "ingredientId": "ING001",
+  "batchNo": "SUP-LOT-20260423-01",
+  "quantity": 120.5,
+  "expiryDate": "2026-05-15",
+  "supplier": "ABC Supplier",
+  "importPrice": 350000,
+  "importDate": "2026-04-23",
+  "notes": "Lô nhập sáng",
+  "minStock": 20
+}
+```
+
+### Validate quan trọng
+- `ingredientId`: bắt buộc
+- `batchNo`: bắt buộc, max 30
+- `quantity`: bắt buộc, > 0
+- `expiryDate`: bắt buộc
+
+### Lỗi thường gặp
+- `400 Số lô '...' đã tồn tại cho nguyên liệu này trong bếp`
+- `400 Ngày hết hạn không được nhỏ hơn ngày hiện tại`
+- `404 Không tìm thấy nguyên liệu: ...`
+
+---
+
+## 5.13) Danh sách lô nguyên liệu
+
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/ingredient-batches`
+- **Permission**: `KITCHEN_INVENTORY_VIEW`
+- **Query**:
+  - `ingredientId` *(optional)*
+  - `ingredientName` *(optional)*
+  - `status` *(optional)*
+  - `page` *(default=0)*
+  - `size` *(default=20)*
+
+### Response
+`data` là phân trang `IngredientBatchResponse[]`.
+
+`IngredientBatchResponse` fields:
+- `id`
+- `kitchenId`
+- `kitchenName`
+- `ingredientId`
+- `ingredientName`
+- `batchNo`
+- `initialQuantity`
+- `remainingQuantity`
+- `unit`
+- `expiryDate`
+- `supplier`
+- `importPrice`
+- `importDate`
+- `status`
+- `notes`
+- `nearExpiry`
+- `createdAt`
+- `updatedAt`
+
+---
+
+## 5.14) Chi tiết 1 lô nguyên liệu
+
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/ingredient-batches/{id}`
+- **Permission**: `KITCHEN_INVENTORY_VIEW`
+
+### Lỗi thường gặp
+- `404 Không tìm thấy lô nguyên liệu: {id}`
+- `400 Lô này không thuộc bếp của bạn`
+
+---
+
+## 5.15) Xem tồn kho nguyên liệu bếp (tổng hợp + chi tiết lô)
 
 - **Method**: `GET`
 - **URL**: `/api/central-kitchen/inventory`
@@ -312,34 +500,75 @@ Nếu sai rule sẽ nhận lỗi:
 - **Query**:
   - `ingredientId` *(optional)*
   - `ingredientName` *(optional, contains + ignore case)*
+  - `lowStock` *(optional: true/false)*
   - `page` *(default=0)*
   - `size` *(default=20)*
 
 ### Response
-`data` là phân trang `KitchenInventoryResponse[]`.
+`data` là phân trang `KitchenInventoryDetailResponse[]`.
 
-`KitchenInventoryResponse` fields:
+`KitchenInventoryDetailResponse` fields:
 - `id`
+- `kitchenId`
+- `kitchenName`
 - `ingredientId`
 - `ingredientName`
-- `quantity`
+- `totalQuantity`
 - `unit`
 - `minStock`
-- `batchNo`
-- `expiryDate`
-- `supplier`
+- `lowStock` (backend tính từ `totalQuantity <= minStock`)
 - `updatedAt`
-- `lowStock` (backend tính từ `quantity <= minStock`)
+- `batches`: `IngredientBatchResponse[]` (danh sách lô active theo FEFO)
 
 ---
 
-## 5.9) Thông tin bếp hiện tại của user
+## 5.16) Danh sách lô thành phẩm
 
 - **Method**: `GET`
+- **URL**: `/api/central-kitchen/product-batches`
+- **Permission**: `PRODUCTION_PLAN_VIEW`
+- **Query**:
+  - `productId` *(optional)*
+  - `status` *(optional)*
+  - `page` *(default=0)*
+  - `size` *(default=20)*
+
+### Response
+`data` là phân trang `BatchResponse[]`.
+
+`BatchResponse` fields:
+- `id`
+- `planId`
+- `productId`
+- `productName`
+- `kitchenId`
+- `kitchenName`
+- `quantity`
+- `remainingQuantity`
+- `unit`
+- `expiryDate`
+- `status`
+- `staff`
+- `notes`
+- `createdAt`
+- `updatedAt`
+- `ingredientBatchUsages` *(traceability)*
+
+---
+
+## 5.17) Chi tiết lô thành phẩm
+
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/product-batches/{batchId}`
+- **Permission**: `PRODUCTION_PLAN_VIEW`
+
+### Lỗi thường gặp
+- `404 Batch not found: {batchId}`
+- `400 Batch does not belong to your kitchen`
 - **URL**: `/api/central-kitchen/my-kitchen`
 - **Permission**: `KITCHEN_INVENTORY_VIEW`
 
-### Response
+## 5.18) Thông tin bếp hiện tại của user
 `data` là `KitchenResponse`:
 - `id`, `name`, `address`, `phone`, `capacity`, `status`, `createdAt`, `updatedAt`
 
@@ -348,7 +577,7 @@ Nếu sai rule sẽ nhận lỗi:
 
 ---
 
-## 5.10) Tổng quan vận hành bếp
+## 5.19) Tổng quan vận hành bếp
 
 - **Method**: `GET`
 - **URL**: `/api/central-kitchen/overview`
@@ -377,7 +606,7 @@ Nếu sai rule sẽ nhận lỗi:
 
 ---
 
-## 5.11) Danh sách cửa hàng
+## 5.20) Danh sách cửa hàng
 
 - **Method**: `GET`
 - **URL**: `/api/central-kitchen/stores`
@@ -406,8 +635,17 @@ Nếu sai rule sẽ nhận lỗi:
 | `PATCH /api/central-kitchen/orders/{orderId}/status` | `ORDER_STATUS_UPDATE` |
 | `GET /api/central-kitchen/order-statuses` | `ORDER_STATUS_UPDATE` |
 | `GET /api/central-kitchen/production-plans` | `PRODUCTION_PLAN_VIEW` |
+| `GET /api/central-kitchen/production-plans/{planId}` | `PRODUCTION_PLAN_VIEW` |
 | `POST /api/central-kitchen/production-plans` | `PRODUCTION_PLAN_CREATE` |
+| `PATCH /api/central-kitchen/production-plans/{planId}/start` | `PRODUCTION_PLAN_UPDATE` |
+| `PATCH /api/central-kitchen/production-plans/{planId}/complete` | `PRODUCTION_PLAN_UPDATE` |
+| `PATCH /api/central-kitchen/production-plans/{planId}/cancel` | `PRODUCTION_PLAN_UPDATE` |
+| `POST /api/central-kitchen/ingredient-batches` | `KITCHEN_INVENTORY_CREATE` |
+| `GET /api/central-kitchen/ingredient-batches` | `KITCHEN_INVENTORY_VIEW` |
+| `GET /api/central-kitchen/ingredient-batches/{id}` | `KITCHEN_INVENTORY_VIEW` |
 | `GET /api/central-kitchen/inventory` | `KITCHEN_INVENTORY_VIEW` |
+| `GET /api/central-kitchen/product-batches` | `PRODUCTION_PLAN_VIEW` |
+| `GET /api/central-kitchen/product-batches/{batchId}` | `PRODUCTION_PLAN_VIEW` |
 | `GET /api/central-kitchen/my-kitchen` | `KITCHEN_INVENTORY_VIEW` |
 | `GET /api/central-kitchen/overview` | `ORDER_VIEW` |
 | `GET /api/central-kitchen/stores` | `STORE_VIEW` |
@@ -423,6 +661,11 @@ Nếu sai rule sẽ nhận lỗi:
 - [ ] Không hardcode transition trái rule.
 - [ ] API assign không truyền `kitchenId`.
 - [ ] Khi update status, cho phép `notes` rỗng hoặc không gửi.
+- [ ] Start/complete/cancel production plan phải dùng `PATCH`.
+- [ ] Tạo production plan xong status ban đầu là `DRAFT`.
+- [ ] Nhập lô nguyên liệu dùng `/api/central-kitchen/ingredient-batches` (không dùng path cũ).
+- [ ] API tồn kho hỗ trợ `lowStock=true/false`; cần truyền đúng kiểu boolean ở query.
+- [ ] UI lô thành phẩm nên hiển thị traceability từ `ingredientBatchUsages`.
 - [ ] Màn overview cần xử lý filter date optional.
 
 ---
@@ -451,6 +694,24 @@ export type KitchenUpdateOrderStatus =
   | "SHIPPING"
   | "DELIVERED"
   | "CANCELLED";
+
+export type ProductionPlanStatus =
+  | "DRAFT"
+  | "APPROVED"
+  | "IN_PRODUCTION"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export type IngredientBatchStatus =
+  | "ACTIVE"
+  | "DEPLETED"
+  | "EXPIRED"
+  | "DISPOSED";
+
+export type ProductBatchStatus =
+  | "AVAILABLE"
+  | "PARTIALLY_DISTRIBUTED"
+  | "FULLY_DISTRIBUTED";
 ```
 
 ---
@@ -462,6 +723,10 @@ export type KitchenUpdateOrderStatus =
 - Sau đó cập nhật theo flow vận hành tới `DELIVERED`.
 - Trường `notes` của order có thể chứa nhiều dòng log nội bộ (append), FE nên hiển thị multiline.
 - `overdueOrders` trong overview là đơn active có `requestedDate < hôm nay`.
+- Tạo production plan chỉ reserve theo FEFO, chưa trừ kho thực tế.
+- Chỉ khi gọi `start` thì mới trừ kho lô nguyên liệu và trừ tồn kho tổng.
+- Nếu hủy plan ở `IN_PRODUCTION`, backend tự hoàn trả tồn kho.
+- Khi complete plan, backend tạo lô thành phẩm mới và yêu cầu `expiryDate`.
 
 ---
 

@@ -3,31 +3,47 @@ package com.example.demologin.serviceImpl;
 import com.example.demologin.dto.request.centralkitchen.CreateProductionPlanRequest;
 import com.example.demologin.dto.request.centralkitchen.UpdateOrderStatusRequest;
 import com.example.demologin.dto.response.CentralKitchenOverviewResponse;
-import com.example.demologin.dto.response.KitchenInventoryResponse;
+
 import com.example.demologin.dto.response.KitchenResponse;
 import com.example.demologin.dto.response.OrderItemResponse;
 import com.example.demologin.dto.response.OrderResponse;
 import com.example.demologin.dto.response.ProductionPlanResponse;
 import com.example.demologin.dto.response.StoreResponse;
+import com.example.demologin.dto.response.BatchResponse;
+import com.example.demologin.dto.response.BatchIngredientUsageResponse;
+import com.example.demologin.dto.response.PlanIngredientResponse;
+import com.example.demologin.dto.response.KitchenInventoryDetailResponse;
+import com.example.demologin.entity.Batch;
+import com.example.demologin.entity.Ingredient;
+import com.example.demologin.entity.IngredientBatch;
 import com.example.demologin.entity.Kitchen;
 import com.example.demologin.entity.KitchenInventory;
 import com.example.demologin.entity.Order;
 import com.example.demologin.entity.OrderItem;
 import com.example.demologin.entity.Product;
 import com.example.demologin.entity.ProductionPlan;
+import com.example.demologin.entity.PlanIngredient;
+import com.example.demologin.entity.PlanIngredientBatchUsage;
+import com.example.demologin.entity.Recipe;
 import com.example.demologin.entity.Store;
 import com.example.demologin.entity.User;
 import com.example.demologin.enums.OrderStatus;
 import com.example.demologin.exception.exceptions.BadRequestException;
 import com.example.demologin.exception.exceptions.NotFoundException;
+import com.example.demologin.repository.BatchRepository;
+import com.example.demologin.repository.IngredientBatchRepository;
 import com.example.demologin.repository.KitchenInventoryRepository;
 import com.example.demologin.repository.OrderItemRepository;
 import com.example.demologin.repository.OrderRepository;
+import com.example.demologin.repository.PlanIngredientRepository;
+import com.example.demologin.repository.PlanIngredientBatchUsageRepository;
 import com.example.demologin.repository.ProductRepository;
 import com.example.demologin.repository.ProductionPlanRepository;
+import com.example.demologin.repository.RecipeRepository;
 import com.example.demologin.repository.StoreRepository;
 import com.example.demologin.repository.UserRepository;
 import com.example.demologin.service.CentralKitchenService;
+import com.example.demologin.service.IngredientBatchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -41,6 +57,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -90,6 +107,13 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
     private final ProductRepository productRepository;
     private final KitchenInventoryRepository kitchenInventoryRepository;
     private final UserRepository userRepository;
+    
+    private final RecipeRepository recipeRepository;
+    private final IngredientBatchRepository ingredientBatchRepository;
+    private final PlanIngredientRepository planIngredientRepository;
+    private final PlanIngredientBatchUsageRepository planIngredientBatchUsageRepository;
+    private final BatchRepository batchRepository;
+    private final IngredientBatchService ingredientBatchService;
 
     @Override
     public Page<OrderResponse> getAllOrders(String status, String storeId, int page, int size, Principal principal) {
@@ -211,9 +235,25 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
     }
 
     @Override
+    public ProductionPlanResponse getProductionPlanById(String planId, Principal principal) {
+        User currentUser = getCurrentCentralKitchenStaff(principal);
+        ProductionPlan plan = productionPlanRepository.findById(planId)
+                .orElseThrow(() -> new NotFoundException("Production plan not found: " + planId));
+                
+        if (currentUser.getKitchen() != null && !plan.getKitchen().getId().equals(currentUser.getKitchen().getId())) {
+            throw new BadRequestException("Plan does not belong to your kitchen");
+        }
+        return toProductionPlanResponse(plan);
+    }
+
+    @Override
     @Transactional
     public ProductionPlanResponse createProductionPlan(CreateProductionPlanRequest request, Principal principal) {
-        validateCentralKitchenStaff(principal);
+        User currentUser = getCurrentCentralKitchenStaff(principal);
+        Kitchen kitchen = currentUser.getKitchen();
+        if (kitchen == null) {
+            throw new BadRequestException("You are not assigned to any kitchen");
+        }
 
         if (!request.getEndDate().isAfter(request.getStartDate())) {
             throw new BadRequestException("endDate must be after startDate");
@@ -222,43 +262,229 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new NotFoundException("Product not found: " + request.getProductId()));
 
-        ProductionPlan plan = ProductionPlan.builder()
-                .id(generateProductionPlanId())
-                .product(product)
-                .quantity(request.getQuantity())
-                .unit(product.getUnit())
-                .status("PLANNED")
-                .startDate(request.getStartDate())
-                .endDate(request.getEndDate())
-                .staff(principal.getName())
-                .notes(request.getNotes())
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+        List<Recipe> recipes = recipeRepository.findAllByProduct_Id(product.getId());
+        if (recipes.isEmpty()) {
+            throw new BadRequestException("Product has no recipe defined");
+        }
 
+        List<PlanIngredient> planIngredients = new ArrayList<>();
+        List<PlanIngredientBatchUsage> usages = new ArrayList<>();
+        
+        ProductionPlan tempPlan = new ProductionPlan();
+        tempPlan.setId(generateProductionPlanId());
+        
+        for (Recipe recipe : recipes) {
+            BigDecimal requiredTotal = recipe.getQuantity().multiply(BigDecimal.valueOf(request.getQuantity()));
+            
+            List<IngredientBatch> batches = ingredientBatchRepository.findActiveByKitchenAndIngredientOrderByExpiryAsc(
+                    kitchen.getId(), recipe.getIngredient().getId());
+                    
+            BigDecimal remainingToFulfill = requiredTotal;
+            for (IngredientBatch batch : batches) {
+                if (remainingToFulfill.compareTo(BigDecimal.ZERO) <= 0) break;
+                
+                BigDecimal qtyToTake = batch.getRemainingQuantity().min(remainingToFulfill);
+                remainingToFulfill = remainingToFulfill.subtract(qtyToTake);
+                
+                usages.add(PlanIngredientBatchUsage.builder()
+                        .plan(tempPlan)
+                        .ingredientBatch(batch)
+                        .quantityUsed(qtyToTake)
+                        .createdAt(LocalDateTime.now())
+                        .build());
+            }
+            
+            if (remainingToFulfill.compareTo(BigDecimal.ZERO) > 0) {
+                throw new BadRequestException("Not enough ingredient: " + recipe.getIngredient().getName() + ". Short by: " + remainingToFulfill + " " + recipe.getUnit());
+            }
+            
+            planIngredients.add(PlanIngredient.builder()
+                    .plan(tempPlan)
+                    .ingredient(recipe.getIngredient())
+                    .quantity(requiredTotal)
+                    .unit(recipe.getUnit())
+                    .createdAt(LocalDateTime.now())
+                    .build());
+        }
+
+        tempPlan.setProduct(product);
+        tempPlan.setKitchen(kitchen);
+        tempPlan.setQuantity(request.getQuantity());
+        tempPlan.setUnit(product.getUnit());
+        tempPlan.setStatus("DRAFT");
+        tempPlan.setStartDate(request.getStartDate());
+        tempPlan.setEndDate(request.getEndDate());
+        tempPlan.setStaff(principal.getName());
+        tempPlan.setNotes(request.getNotes());
+        tempPlan.setCreatedAt(LocalDateTime.now());
+        tempPlan.setUpdatedAt(LocalDateTime.now());
+
+        ProductionPlan savedPlan = productionPlanRepository.save(tempPlan);
+        
+        for (PlanIngredient pi : planIngredients) pi.setPlan(savedPlan);
+        for (PlanIngredientBatchUsage usage : usages) usage.setPlan(savedPlan);
+        
+        planIngredientRepository.saveAll(planIngredients);
+        planIngredientBatchUsageRepository.saveAll(usages);
+
+        return toProductionPlanResponse(savedPlan);
+    }
+
+    @Override
+    @Transactional
+    public ProductionPlanResponse startProductionPlan(String planId, Principal principal) {
+        User currentUser = getCurrentCentralKitchenStaff(principal);
+        ProductionPlan plan = productionPlanRepository.findById(planId)
+                .orElseThrow(() -> new NotFoundException("Plan not found: " + planId));
+                
+        if (!"DRAFT".equals(plan.getStatus()) && !"APPROVED".equals(plan.getStatus())) {
+            throw new BadRequestException("Can only start DRAFT or APPROVED plans");
+        }
+        
+        List<PlanIngredientBatchUsage> usages = planIngredientBatchUsageRepository.findByPlan_Id(planId);
+        for (PlanIngredientBatchUsage usage : usages) {
+            IngredientBatch batch = usage.getIngredientBatch();
+            BigDecimal newQty = batch.getRemainingQuantity().subtract(usage.getQuantityUsed());
+            if (newQty.compareTo(BigDecimal.ZERO) < 0) {
+                throw new BadRequestException("Batch " + batch.getBatchNo() + " does not have enough qty now. Please recreate plan.");
+            }
+            batch.setRemainingQuantity(newQty);
+            if (newQty.compareTo(BigDecimal.ZERO) == 0) {
+                batch.setStatus("DEPLETED");
+            }
+            batch.setUpdatedAt(LocalDateTime.now());
+            ingredientBatchRepository.save(batch);
+            
+            KitchenInventory inv = kitchenInventoryRepository.findByKitchen_IdAndIngredient_Id(
+                    plan.getKitchen().getId(), batch.getIngredient().getId()).orElse(null);
+            if (inv != null) {
+                inv.setTotalQuantity(inv.getTotalQuantity().subtract(usage.getQuantityUsed()));
+                inv.setUpdatedAt(LocalDateTime.now());
+                kitchenInventoryRepository.save(inv);
+            }
+        }
+        
+        plan.setStatus("IN_PRODUCTION");
+        plan.setUpdatedAt(LocalDateTime.now());
         return toProductionPlanResponse(productionPlanRepository.save(plan));
     }
 
     @Override
-    public Page<KitchenInventoryResponse> getInventory(String ingredientId, String ingredientName, int page, int size, Principal principal) {
-        validateCentralKitchenStaff(principal);
-
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
-
-        Specification<KitchenInventory> spec = Specification.where(null);
-
-        String normalizedIngredientId = normalizeText(ingredientId);
-        if (normalizedIngredientId != null) {
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("ingredient").get("id"), normalizedIngredientId));
+    @Transactional
+    public ProductionPlanResponse completeProductionPlan(String planId, String notes, LocalDate expiryDate, Principal principal) {
+        User currentUser = getCurrentCentralKitchenStaff(principal);
+        ProductionPlan plan = productionPlanRepository.findById(planId)
+                .orElseThrow(() -> new NotFoundException("Plan not found: " + planId));
+                
+        if (!"IN_PRODUCTION".equals(plan.getStatus())) {
+            throw new BadRequestException("Plan is not in production");
         }
-
-        String normalizedIngredientName = normalizeText(ingredientName);
-        if (normalizedIngredientName != null) {
-            String keyword = "%" + normalizedIngredientName.toLowerCase() + "%";
-            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("ingredient").get("name")), keyword));
+        
+        if (expiryDate == null) {
+            throw new BadRequestException("expiryDate is required for the finished product batch");
         }
+        
+        plan.setStatus("COMPLETED");
+        if (notes != null && !notes.isBlank()) {
+            plan.setNotes(appendInternalNote(plan.getNotes(), principal.getName(), notes));
+        }
+        plan.setUpdatedAt(LocalDateTime.now());
+        ProductionPlan savedPlan = productionPlanRepository.save(plan);
+        
+        String batchId = "PB" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMddHHmmss"));
+        Batch batch = Batch.builder()
+                .id(batchId)
+                .plan(savedPlan)
+                .product(savedPlan.getProduct())
+                .kitchen(savedPlan.getKitchen())
+                .quantity(savedPlan.getQuantity())
+                .remainingQuantity(savedPlan.getQuantity())
+                .unit(savedPlan.getUnit())
+                .expiryDate(expiryDate)
+                .status("AVAILABLE")
+                .staff(principal.getName())
+                .notes("Generated from plan " + savedPlan.getId())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+        batchRepository.save(batch);
+        
+        return toProductionPlanResponse(savedPlan);
+    }
 
-        return kitchenInventoryRepository.findAll(spec, pageRequest).map(this::toKitchenInventoryResponse);
+    @Override
+    @Transactional
+    public ProductionPlanResponse cancelProductionPlan(String planId, String notes, Principal principal) {
+        User currentUser = getCurrentCentralKitchenStaff(principal);
+        ProductionPlan plan = productionPlanRepository.findById(planId)
+                .orElseThrow(() -> new NotFoundException("Plan not found: " + planId));
+                
+        if ("COMPLETED".equals(plan.getStatus())) {
+            throw new BadRequestException("Cannot cancel completed plan");
+        }
+        
+        if ("IN_PRODUCTION".equals(plan.getStatus())) {
+            List<PlanIngredientBatchUsage> usages = planIngredientBatchUsageRepository.findByPlan_Id(planId);
+            for (PlanIngredientBatchUsage usage : usages) {
+                IngredientBatch batch = usage.getIngredientBatch();
+                batch.setRemainingQuantity(batch.getRemainingQuantity().add(usage.getQuantityUsed()));
+                if ("DEPLETED".equals(batch.getStatus()) && batch.getRemainingQuantity().compareTo(BigDecimal.ZERO) > 0) {
+                    batch.setStatus("ACTIVE");
+                }
+                batch.setUpdatedAt(LocalDateTime.now());
+                ingredientBatchRepository.save(batch);
+                
+                KitchenInventory inv = kitchenInventoryRepository.findByKitchen_IdAndIngredient_Id(
+                        plan.getKitchen().getId(), batch.getIngredient().getId()).orElse(null);
+                if (inv != null) {
+                    inv.setTotalQuantity(inv.getTotalQuantity().add(usage.getQuantityUsed()));
+                    inv.setUpdatedAt(LocalDateTime.now());
+                    kitchenInventoryRepository.save(inv);
+                }
+            }
+            planIngredientBatchUsageRepository.deleteAll(usages);
+        }
+        
+        plan.setStatus("CANCELLED");
+        if (notes != null && !notes.isBlank()) {
+            plan.setNotes(appendInternalNote(plan.getNotes(), principal.getName(), notes));
+        }
+        plan.setUpdatedAt(LocalDateTime.now());
+        return toProductionPlanResponse(productionPlanRepository.save(plan));
+    }
+
+    @Override
+    public Page<BatchResponse> getProductBatches(String productId, String status, int page, int size, Principal principal) {
+        User currentUser = getCurrentCentralKitchenStaff(principal);
+        Kitchen kitchen = currentUser.getKitchen();
+        
+        Specification<Batch> spec = Specification.where((root, q, cb) -> cb.equal(root.get("kitchen").get("id"), kitchen.getId()));
+        if (productId != null && !productId.isBlank()) {
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("product").get("id"), productId.trim()));
+        }
+        if (status != null && !status.isBlank()) {
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("status"), status.trim().toUpperCase()));
+        }
+        
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return batchRepository.findAll(spec, pageRequest).map(this::toBatchResponse);
+    }
+
+    @Override
+    public BatchResponse getProductBatchById(String batchId, Principal principal) {
+        User currentUser = getCurrentCentralKitchenStaff(principal);
+        Batch batch = batchRepository.findById(batchId)
+                .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
+                
+        if (currentUser.getKitchen() != null && !batch.getKitchen().getId().equals(currentUser.getKitchen().getId())) {
+            throw new BadRequestException("Batch does not belong to your kitchen");
+        }
+        return toBatchResponse(batch);
+    }
+
+    @Override
+    public Page<KitchenInventoryDetailResponse> getInventory(String ingredientId, String ingredientName, Boolean lowStock, int page, int size, Principal principal) {
+        return ingredientBatchService.getInventory(ingredientId, ingredientName, lowStock, page, size, principal);
     }
 
     @Override
@@ -520,10 +746,32 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
 
     private ProductionPlanResponse toProductionPlanResponse(ProductionPlan plan) {
         Product product = plan.getProduct();
+        
+        List<PlanIngredientResponse> ingredientResponses = null;
+        if (plan.getId() != null) {
+            List<PlanIngredient> pis = planIngredientRepository.findByPlan_Id(plan.getId());
+            if (pis != null && !pis.isEmpty()) {
+                ingredientResponses = pis.stream().map(pi -> {
+                    BigDecimal available = ingredientBatchRepository.sumRemainingByKitchenAndIngredient(
+                            plan.getKitchen().getId(), pi.getIngredient().getId());
+                    return PlanIngredientResponse.builder()
+                            .ingredientId(pi.getIngredient().getId())
+                            .ingredientName(pi.getIngredient().getName())
+                            .requiredQuantity(pi.getQuantity())
+                            .availableQuantity(available != null ? available : BigDecimal.ZERO)
+                            .unit(pi.getUnit())
+                            .sufficient(available != null && available.compareTo(pi.getQuantity()) >= 0)
+                            .build();
+                }).toList();
+            }
+        }
+
         return ProductionPlanResponse.builder()
                 .id(plan.getId())
                 .productId(product != null ? product.getId() : null)
                 .productName(product != null ? product.getName() : null)
+                .kitchenId(plan.getKitchen() != null ? plan.getKitchen().getId() : null)
+                .kitchenName(plan.getKitchen() != null ? plan.getKitchen().getName() : null)
                 .quantity(plan.getQuantity())
                 .unit(plan.getUnit())
                 .status(plan.getStatus())
@@ -533,28 +781,46 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
                 .notes(plan.getNotes())
                 .createdAt(plan.getCreatedAt())
                 .updatedAt(plan.getUpdatedAt())
+                .ingredients(ingredientResponses)
+                .build();
+    }
+    
+    private BatchResponse toBatchResponse(Batch batch) {
+        List<BatchIngredientUsageResponse> usages = null;
+        if (batch.getPlan() != null) {
+            List<PlanIngredientBatchUsage> pu = planIngredientBatchUsageRepository.findByPlan_Id(batch.getPlan().getId());
+            usages = pu.stream().map(u -> BatchIngredientUsageResponse.builder()
+                    .ingredientBatchId(u.getIngredientBatch().getId())
+                    .ingredientId(u.getIngredientBatch().getIngredient().getId())
+                    .ingredientName(u.getIngredientBatch().getIngredient().getName())
+                    .batchNo(u.getIngredientBatch().getBatchNo())
+                    .quantityUsed(u.getQuantityUsed())
+                    .unit(u.getIngredientBatch().getUnit())
+                    .expiryDate(u.getIngredientBatch().getExpiryDate())
+                    .build()).toList();
+        }
+
+        return BatchResponse.builder()
+                .id(batch.getId())
+                .planId(batch.getPlan() != null ? batch.getPlan().getId() : null)
+                .productId(batch.getProduct() != null ? batch.getProduct().getId() : null)
+                .productName(batch.getProduct() != null ? batch.getProduct().getName() : null)
+                .kitchenId(batch.getKitchen() != null ? batch.getKitchen().getId() : null)
+                .kitchenName(batch.getKitchen() != null ? batch.getKitchen().getName() : null)
+                .quantity(batch.getQuantity())
+                .remainingQuantity(batch.getRemainingQuantity())
+                .unit(batch.getUnit())
+                .expiryDate(batch.getExpiryDate())
+                .status(batch.getStatus())
+                .staff(batch.getStaff())
+                .notes(batch.getNotes())
+                .createdAt(batch.getCreatedAt())
+                .updatedAt(batch.getUpdatedAt())
+                .ingredientBatchUsages(usages)
                 .build();
     }
 
-    private KitchenInventoryResponse toKitchenInventoryResponse(KitchenInventory inventory) {
-        return KitchenInventoryResponse.builder()
-                .id(inventory.getId())
-                .kitchenId(inventory.getKitchen() != null ? inventory.getKitchen().getId() : null)
-                .kitchenName(inventory.getKitchen() != null ? inventory.getKitchen().getName() : null)
-                .ingredientId(inventory.getIngredient().getId())
-                .ingredientName(inventory.getIngredient().getName())
-                .quantity(inventory.getQuantity())
-                .unit(inventory.getUnit())
-                .minStock(inventory.getMinStock())
-                .batchNo(inventory.getBatchNo())
-                .expiryDate(inventory.getExpiryDate())
-                .supplier(inventory.getSupplier())
-                .updatedAt(inventory.getUpdatedAt())
-                .lowStock(inventory.getQuantity() != null
-                        && inventory.getMinStock() != null
-                    && inventory.getQuantity().compareTo(BigDecimal.valueOf(inventory.getMinStock())) <= 0)
-                .build();
-    }
+
 
     private StoreResponse toStoreResponse(Store store) {
         return StoreResponse.builder()

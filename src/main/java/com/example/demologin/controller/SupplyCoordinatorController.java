@@ -63,6 +63,24 @@ public class SupplyCoordinatorController {
         return supplyCoordinatorService.getOrders(status, priority, storeId, kitchenId, fromDate, toDate, page, size, principal);
     }
 
+    @GetMapping("/kitchens")
+    @PageResponse
+    @ApiResponse(message = "Kitchens retrieved successfully")
+    @SecuredEndpoint("SUPPLY_ORDER_VIEW")
+    @Operation(
+            summary = "Danh sach bep trung tam",
+            description = "Lay toan bo danh sach bep trung tam de ho tro bo loc va dieu phoi don hang."
+    )
+    public Object getKitchens(
+            @Parameter(description = "Page index (0-based)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "20")
+            @RequestParam(defaultValue = "20") int size,
+            Principal principal
+    ) {
+        return supplyCoordinatorService.getKitchens(page, size, principal);
+    }
+
     @GetMapping("/orders/{orderId}")
     @ApiResponse(message = "Order retrieved successfully")
     @SecuredEndpoint("SUPPLY_ORDER_VIEW")

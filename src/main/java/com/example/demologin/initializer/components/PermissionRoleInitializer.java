@@ -57,6 +57,7 @@ public class PermissionRoleInitializer {
     private static final String PRODUCT_MANAGE = "PRODUCT_MANAGE";
     private static final String RECIPE_MANAGE = "RECIPE_MANAGE";
     private static final String INVENTORY_VIEW = "INVENTORY_VIEW";
+    private static final String INVENTORY_MANAGE = "INVENTORY_MANAGE";
     private static final String MANAGER_DASHBOARD_VIEW = "MANAGER_DASHBOARD_VIEW";
     private static final String STORE_VIEW = "STORE_VIEW";
 
@@ -139,6 +140,7 @@ public class PermissionRoleInitializer {
                 ensurePermission(PRODUCT_MANAGE, "Quản lý sản phẩm");
                 ensurePermission(RECIPE_MANAGE, "Quản lý công thức và định mức nguyên liệu");
                 ensurePermission(INVENTORY_VIEW, "Xem tồn kho bếp trung tâm và cửa hàng");
+                ensurePermission(INVENTORY_MANAGE, "Quản lý tồn kho bếp trung tâm");
                 ensurePermission(MANAGER_DASHBOARD_VIEW, "Xem dashboard vận hành manager");
                 ensurePermission(STORE_VIEW, "Xem thông tin chi nhánh cửa hàng");
                 ensurePermission(ORDER_VIEW, "Xem đơn đặt hàng");
@@ -206,6 +208,7 @@ public class PermissionRoleInitializer {
         managerPerms.add(permMap.get(PRODUCT_MANAGE));
         managerPerms.add(permMap.get(RECIPE_MANAGE));
         managerPerms.add(permMap.get(INVENTORY_VIEW));
+        managerPerms.add(permMap.get(INVENTORY_MANAGE));
         managerPerms.add(permMap.get(MANAGER_DASHBOARD_VIEW));
         managerPerms.add(permMap.get(STORE_VIEW));
         managerPerms.add(permMap.get(SALES_REPORT_VIEW));

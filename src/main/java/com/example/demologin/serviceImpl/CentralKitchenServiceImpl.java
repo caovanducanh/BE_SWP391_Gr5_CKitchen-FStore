@@ -539,6 +539,8 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
     private KitchenInventoryResponse toKitchenInventoryResponse(KitchenInventory inventory) {
         return KitchenInventoryResponse.builder()
                 .id(inventory.getId())
+                .kitchenId(inventory.getKitchen() != null ? inventory.getKitchen().getId() : null)
+                .kitchenName(inventory.getKitchen() != null ? inventory.getKitchen().getName() : null)
                 .ingredientId(inventory.getIngredient().getId())
                 .ingredientName(inventory.getIngredient().getName())
                 .quantity(inventory.getQuantity())

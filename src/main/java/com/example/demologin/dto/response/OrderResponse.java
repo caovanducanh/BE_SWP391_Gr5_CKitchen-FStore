@@ -4,6 +4,7 @@ import com.example.demologin.enums.OrderStatus;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
+@Setter
 @Builder
 public class OrderResponse {
     private String id;
@@ -26,5 +28,6 @@ public class OrderResponse {
     private String createdBy;
     private BigDecimal total;
     private LocalDateTime updatedAt;
+    private Double distance;
     private List<OrderItemResponse> items;
 }

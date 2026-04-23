@@ -10,13 +10,15 @@ import org.springframework.data.domain.Page;
 import java.security.Principal;
 
 public interface ShipperService {
-    Page<OrderResponse> getAvailableOrders(int page, int size, Principal principal);
+    Page<OrderResponse> getAvailableOrders(int page, int size, Double lat, Double lon, Principal principal);
 
     DeliveryResponse scanPickupQr(ScanPickupQrRequest request, Principal principal);
 
     DeliveryResponse markDeliverySuccess(String deliveryId, MarkDeliverySuccessRequest request, Principal principal);
 
-    Page<DeliveryResponse> getMyDeliveries(int page, int size, Principal principal);
+    Page<DeliveryResponse> getMyDeliveries(int page, int size, Double lat, Double lon, Principal principal);
 
     OrderHolderResponse getOrderHolder(String orderId, Principal principal);
+    
+    DeliveryResponse getDeliveryById(String deliveryId, Principal principal);
 }

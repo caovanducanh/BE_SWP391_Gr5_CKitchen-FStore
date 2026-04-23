@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 public class Delivery {
 
     @Id
-    @Column(length = 10)
+    @Column(length = 30)
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

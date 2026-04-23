@@ -36,36 +36,36 @@ public class RecipeInitializer {
 
         List<Recipe> recipes = new ArrayList<>();
 
-        // Get some products and ingredients
+        // Get some products and ingredients using the new BAKE IDs
         Product prod1 = productRepository.findById("PROD001").orElse(null); // Croissant
         Product prod2 = productRepository.findById("PROD002").orElse(null); // Bánh mì gối
 
-        Ingredient ing1 = ingredientRepository.findById("ING001").orElse(null); // Bột mì
-        Ingredient ing5 = ingredientRepository.findById("ING005").orElse(null); // Bơ
+        Ingredient flourBakery = ingredientRepository.findById("BAKE001").orElse(null); // Bột mì đa dụng
+        Ingredient butterBakery = ingredientRepository.findById("BAKE030").orElse(null); // Bơ lạt
 
-        if (prod1 != null && ing1 != null && ing5 != null) {
+        if (prod1 != null && flourBakery != null && butterBakery != null) {
             // Recipe for Croissant
             recipes.add(Recipe.builder()
                     .product(prod1)
-                    .ingredient(ing1)
+                    .ingredient(flourBakery)
                     .quantity(new BigDecimal("0.2")) // 200g bột mì
                     .unit("kg")
                     .createdAt(LocalDateTime.now())
                     .build());
             recipes.add(Recipe.builder()
                     .product(prod1)
-                    .ingredient(ing5)
+                    .ingredient(butterBakery)
                     .quantity(new BigDecimal("0.1")) // 100g bơ
                     .unit("kg")
                     .createdAt(LocalDateTime.now())
                     .build());
         }
 
-        if (prod2 != null && ing1 != null) {
+        if (prod2 != null && flourBakery != null) {
             // Recipe for Bánh mì gối
             recipes.add(Recipe.builder()
                     .product(prod2)
-                    .ingredient(ing1)
+                    .ingredient(flourBakery)
                     .quantity(new BigDecimal("0.5")) // 500g bột mì
                     .unit("kg")
                     .createdAt(LocalDateTime.now())

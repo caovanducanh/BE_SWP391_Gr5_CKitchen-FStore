@@ -44,33 +44,6 @@ public class ManagerInventoryController {
         return managerInventoryService.getKitchenInventory(kitchenId, lowStock, page, size);
     }
 
-    @PostMapping("/kitchen")
-    @ApiResponse(message = "Kitchen inventory item created successfully")
-    @SecuredEndpoint("INVENTORY_MANAGE")
-    @Operation(summary = "Create kitchen inventory item", description = "Manager creates an inventory item in central kitchen warehouse")
-    public Object createKitchenInventory(@Valid @RequestBody KitchenInventoryUpsertRequest request) {
-        return managerInventoryService.createKitchenInventory(request);
-    }
-
-    @PutMapping("/kitchen/{id}")
-    @ApiResponse(message = "Kitchen inventory item updated successfully")
-    @SecuredEndpoint("INVENTORY_MANAGE")
-    @Operation(summary = "Update kitchen inventory item", description = "Manager updates an inventory item in central kitchen warehouse")
-    public Object updateKitchenInventory(
-            @PathVariable Integer id,
-            @Valid @RequestBody KitchenInventoryUpsertRequest request
-    ) {
-        return managerInventoryService.updateKitchenInventory(id, request);
-    }
-
-    @DeleteMapping("/kitchen/{id}")
-    @ApiResponse(message = "Kitchen inventory item deleted successfully")
-    @SecuredEndpoint("INVENTORY_MANAGE")
-    @Operation(summary = "Delete kitchen inventory item", description = "Manager deletes an inventory item in central kitchen warehouse")
-    public void deleteKitchenInventory(@PathVariable Integer id) {
-        managerInventoryService.deleteKitchenInventory(id);
-    }
-
     @GetMapping("/kitchens")
     @ApiResponse(message = "Kitchens retrieved successfully")
     @SecuredEndpoint("INVENTORY_VIEW")

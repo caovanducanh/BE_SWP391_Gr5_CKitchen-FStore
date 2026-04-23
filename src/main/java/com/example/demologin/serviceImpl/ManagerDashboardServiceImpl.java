@@ -72,7 +72,7 @@ public class ManagerDashboardServiceImpl implements ManagerDashboardService {
                 .inventoryId(item.getId())
                 .ingredientId(item.getIngredient().getId())
                 .ingredientName(item.getIngredient().getName())
-                .quantity(item.getQuantity())
+                .quantity(item.getTotalQuantity())
                 .minStock(item.getMinStock())
                 .unit(item.getUnit())
                 .build();

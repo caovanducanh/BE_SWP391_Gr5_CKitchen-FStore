@@ -5,6 +5,7 @@ import com.example.demologin.entity.Delivery;
 import com.example.demologin.entity.Ingredient;
 import com.example.demologin.entity.InventoryDisposal;
 import com.example.demologin.entity.Kitchen;
+import com.example.demologin.entity.IngredientBatch;
 import com.example.demologin.entity.KitchenInventory;
 import com.example.demologin.entity.Order;
 import com.example.demologin.entity.OrderPriorityConfig;
@@ -18,6 +19,7 @@ import com.example.demologin.repository.BatchRepository;
 import com.example.demologin.repository.DeliveryRepository;
 import com.example.demologin.repository.IngredientRepository;
 import com.example.demologin.repository.InventoryDisposalRepository;
+import com.example.demologin.repository.IngredientBatchRepository;
 import com.example.demologin.repository.KitchenInventoryRepository;
 import com.example.demologin.repository.KitchenRepository;
 import com.example.demologin.repository.OrderItemRepository;
@@ -25,6 +27,7 @@ import com.example.demologin.repository.OrderPriorityConfigRepository;
 import com.example.demologin.repository.OrderRepository;
 import com.example.demologin.repository.ProductRepository;
 import com.example.demologin.repository.ProductionPlanRepository;
+import com.example.demologin.repository.RecipeRepository;
 import com.example.demologin.repository.StoreInventoryRepository;
 import com.example.demologin.repository.StoreRepository;
 import com.example.demologin.repository.UserRepository;
@@ -37,7 +40,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Random;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -60,29 +67,46 @@ public class ManagerDashboardDataInitializer {
     private final DeliveryRepository deliveryRepository;
     private final OrderPriorityConfigRepository orderPriorityConfigRepository;
     private final IngredientRepository ingredientRepository;
+    private final IngredientBatchRepository ingredientBatchRepository;
+    private final RecipeRepository recipeRepository;
     private final UserRepository userRepository;
 
     @Transactional
     public void initializeManagerDashboardData() {
         log.info("Creating manager dashboard seed data...");
 
-        ensurePriorityConfigs();
-                Kitchen kitchen = ensureKitchen();
-                Kitchen kitchen2 = ensureKitchen2();
-                ensureKitchenStaffAssignment(kitchen);
-                Store store = ensureStore();
-                Store store2 = ensureStore2();
+        // Revised General Cleanup: Remove ANYTHING that is not bakery-focused (ID doesn't start with BAKE)
+        List<Ingredient> nonBakeryIngredients = ingredientRepository.findAll().stream()
+                .filter(i -> !i.getId().startsWith("BAKE"))
+                .toList();
 
+        if (!nonBakeryIngredients.isEmpty()) {
+            List<String> idsToDelete = nonBakeryIngredients.stream().map(Ingredient::getId).toList();
+            log.info("🧹 Optimized General Cleanup: Removing {} non-bakery ingredient entries...", idsToDelete.size());
+
+            // Bulk deletes for high performance
+            recipeRepository.deleteByIngredient_IdIn(idsToDelete);
+            ingredientBatchRepository.deleteByIngredient_IdIn(idsToDelete);
+            kitchenInventoryRepository.deleteByIngredient_IdIn(idsToDelete);
+
+            ingredientRepository.deleteAllInBatch(nonBakeryIngredients);
+        }
+
+        ensurePriorityConfigs();
+        log.info("🏠 Initializing Kitchens, Staff, and Stores...");
+        Kitchen kitchen = ensureKitchen();
+        Kitchen kitchen2 = ensureKitchen2();
+        ensureKitchenStaffAssignment(kitchen);
+        Store store = ensureStore();
+        Store store2 = ensureStore2();
+
+        log.info("🥞 Finding baseline products...");
         Product product1 = productRepository.findById("PROD001")
                 .orElseThrow(() -> new IllegalStateException("Product PROD001 not found"));
         Product product2 = productRepository.findById("PROD002")
                 .orElseThrow(() -> new IllegalStateException("Product PROD002 not found"));
 
-        Ingredient ingredient1 = ingredientRepository.findById("ING001")
-                .orElseThrow(() -> new IllegalStateException("Ingredient ING001 not found"));
-        Ingredient ingredient2 = ingredientRepository.findById("ING002")
-                .orElseThrow(() -> new IllegalStateException("Ingredient ING002 not found"));
-
+        log.info("📅 Ensuring Production Plans...");
         ProductionPlan plan1 = ensureProductionPlan(
                 "PLAN001", product1, 120, "cai", "PLANNED",
                 LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(1),
@@ -191,17 +215,20 @@ public class ManagerDashboardDataInitializer {
             ensureDelivery("DEL007", order12, coordinator, "DELIVERED", LocalDateTime.now().minusDays(4));
 
             ensureBatch(
-                    "BATCH001", order1, 1, plan1, product1, kitchen,
-                    80, "cai", "IN_PROGRESS", LocalDateTime.now().minusHours(1), null,
+                    "BATCH001", plan1, product1, kitchen,
+                    80, 80, "cai", "AVAILABLE", LocalDate.now().plusDays(5),
                     "kitchen"
             );
         } else {
             log.info("Skipping order/delivery seed data (app.seed.orders.enabled=false)");
         }
 
-        ensureKitchenInventories(kitchen, kitchen2, ingredient1, ingredient2);
-        backfillKitchenInventoryKitchen(kitchen);
+        ensureKitchenInventories(kitchen, kitchen2);
+        
+        log.info("🏪 Ensuring Store Inventories...");
         ensureStoreInventories(store, product1, product2);
+        
+        log.info("🗑️ Ensuring Inventory Disposals...");
         ensureInventoryDisposals();
 
         log.info("✅ Manager dashboard seed data ready");
@@ -390,29 +417,25 @@ public class ManagerDashboardDataInitializer {
         }
 
     private void ensureBatch(String id,
-                             Order order,
-                             Integer orderItemIndex,
                              ProductionPlan plan,
                              Product product,
                              Kitchen kitchen,
                              Integer quantity,
+                             Integer remainingQuantity,
                              String unit,
                              String status,
-                             LocalDateTime startDate,
-                             LocalDateTime endDate,
+                             LocalDate expiryDate,
                              String staff) {
         batchRepository.findById(id).orElseGet(() -> batchRepository.save(Batch.builder()
                 .id(id)
-                .order(order)
-                .orderItemIndex(orderItemIndex)
                 .plan(plan)
                 .product(product)
                 .kitchen(kitchen)
                 .quantity(quantity)
+                .remainingQuantity(remainingQuantity)
                 .unit(unit)
                 .status(status)
-                .startDate(startDate)
-                .endDate(endDate)
+                .expiryDate(expiryDate)
                 .staff(staff)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -434,45 +457,65 @@ public class ManagerDashboardDataInitializer {
         );
     }
 
-        private void ensureKitchenInventories(Kitchen kitchen, Kitchen kitchen2, Ingredient ingredient1, Ingredient ingredient2) {
-        if (kitchenInventoryRepository.count() > 0) {
-            return;
+    private void ensureKitchenInventories(Kitchen kitchen, Kitchen kitchen2) {
+        List<Ingredient> allIngredients = ingredientRepository.findAll();
+        log.info("Ensuring warehouse inventories for {} ingredients cross kitchens...", allIngredients.size());
+
+        for (Ingredient ing : allIngredients) {
+            upsertKitchenInventoryAndBatches(kitchen, ing);
+            upsertKitchenInventoryAndBatches(kitchen2, ing);
         }
 
-        kitchenInventoryRepository.saveAll(List.of(
-                KitchenInventory.builder()
-                                                .kitchen(kitchen)
-                        .ingredient(ingredient1)
-                        .quantity(new BigDecimal("4"))
-                        .unit("kg")
-                        .minStock(10)
-                        .batchNo("KINV-001")
-                        .supplier("Cong ty Bot Mi")
-                        .updatedAt(LocalDateTime.now())
-                        .build(),
-                KitchenInventory.builder()
-                        .kitchen(kitchen2)
-                        .ingredient(ingredient2)
-                        .quantity(new BigDecimal("12"))
-                        .unit("kg")
-                        .minStock(5)
-                        .batchNo("KINV-002")
-                        .supplier("Cong ty Duong")
-                        .updatedAt(LocalDateTime.now())
-                        .build()
-        ));
+        log.info("✅ Kitchen inventory and batches initialized.");
     }
 
-        private void backfillKitchenInventoryKitchen(Kitchen defaultKitchen) {
-                List<KitchenInventory> missingKitchenRows = kitchenInventoryRepository.findByKitchenIsNull();
-                if (missingKitchenRows.isEmpty()) {
-                        return;
-                }
+    private void upsertKitchenInventoryAndBatches(Kitchen kitchen, Ingredient ingredient) {
+        Random random = new Random();
+        // Check if we already have a decent amount (at least 1000 units)
+        Optional<KitchenInventory> existing = kitchenInventoryRepository.findByKitchen_IdAndIngredient_Id(kitchen.getId(), ingredient.getId());
 
-                missingKitchenRows.forEach(inv -> inv.setKitchen(defaultKitchen));
-                kitchenInventoryRepository.saveAll(missingKitchenRows);
-                log.info("✅ Backfilled {} kitchen_inventory rows with kitchen {}", missingKitchenRows.size(), defaultKitchen.getId());
+        if (existing.isPresent() && existing.get().getTotalQuantity().compareTo(new BigDecimal("1000")) > 0) {
+            return; // Already has plenty
         }
+
+        // Add more batches to boost stock
+        double randomQty = 2000.0 + (3000.0 * random.nextDouble());
+        BigDecimal qty = BigDecimal.valueOf(randomQty).setScale(2, java.math.RoundingMode.HALF_UP);
+
+        IngredientBatch boostBatch = IngredientBatch.builder()
+                .id("B-" + UUID.randomUUID().toString().substring(0, 10))
+                .ingredient(ingredient)
+                .kitchen(kitchen)
+                .batchNo("BOOST-" + (100000 + random.nextInt(900000)))
+                .supplier("SYSTEM_BOOST")
+                .initialQuantity(qty)
+                .remainingQuantity(qty)
+                .unit(ingredient.getUnit())
+                .expiryDate(LocalDate.now().plusYears(1))
+                .status("ACTIVE")
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        ingredientBatchRepository.save(boostBatch);
+
+        if (existing.isPresent()) {
+            KitchenInventory ki = existing.get();
+            ki.setTotalQuantity(ki.getTotalQuantity().add(qty));
+            ki.setUpdatedAt(LocalDateTime.now());
+            kitchenInventoryRepository.save(ki);
+        } else {
+            KitchenInventory ki = KitchenInventory.builder()
+                    .kitchen(kitchen)
+                    .ingredient(ingredient)
+                    .totalQuantity(qty)
+                    .unit(ingredient.getUnit())
+                    .minStock(ingredient.getMinStock())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            kitchenInventoryRepository.save(ki);
+        }
+    }
 
     private void ensureStoreInventories(Store store, Product product1, Product product2) {
         if (storeInventoryRepository.count() > 0) {

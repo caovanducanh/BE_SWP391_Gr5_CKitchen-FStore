@@ -1,26 +1,21 @@
 package com.example.demologin.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.persistence.*;
+import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * Tổng hợp tồn kho nguyên liệu theo (kitchen, ingredient).
+ * Chi tiết từng lô được lưu trong bảng ingredient_batches.
+ * totalQuantity = sum(ingredient_batches.remaining_quantity) cho cặp (kitchen, ingredient).
+ */
 @Entity
-@Table(name = "kitchen_inventory")
+@Table(name = "kitchen_inventory", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_kitchen_inventory_kitchen_ingredient",
+                columnNames = {"kitchen_id", "ingredient_id"})
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -36,26 +31,19 @@ public class KitchenInventory {
     @JoinColumn(name = "ingredient_id", nullable = false)
     private Ingredient ingredient;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "kitchen_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "kitchen_id", nullable = false)
     private Kitchen kitchen;
 
+    /** Tổng số lượng còn lại (sum của tất cả lô ingredient_batches còn ACTIVE) */
     @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal quantity;
+    private BigDecimal totalQuantity;
 
     @Column(nullable = false, length = 20)
     private String unit;
 
     @Column(nullable = false)
     private Integer minStock;
-
-    @Column(length = 30)
-    private String batchNo;
-
-    private LocalDate expiryDate;
-
-    @Column(length = 100)
-    private String supplier;
 
     private LocalDateTime updatedAt;
 }

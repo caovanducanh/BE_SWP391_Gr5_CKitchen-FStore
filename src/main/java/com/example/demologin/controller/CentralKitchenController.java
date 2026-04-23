@@ -264,4 +264,49 @@ public class CentralKitchenController {
     ) {
         return centralKitchenService.getStores(name, status, page, size, principal);
     }
+
+    @GetMapping("/products")
+    @PageResponse
+    @ApiResponse(message = "Products retrieved successfully")
+    @SecuredEndpoint("PRODUCTION_PLAN_VIEW")
+    @Operation(
+            summary = "Truy vấn danh sách sản phẩm",
+            description = "Kitchen staff truy vấn danh sách sản phẩm để lập kế hoạch sản xuất. Hỗ trợ tìm kiếm theo tên hoặc ID."
+    )
+    public Object getProducts(
+            @Parameter(description = "Tìm kiếm theo tên hoặc ID (contains, ignore case)", example = "PROD000001")
+            @RequestParam(required = false) String search,
+            @Parameter(description = "Lọc theo category", example = "BAKERY")
+            @RequestParam(required = false) String category,
+            @Parameter(description = "Page index (0-based)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "20")
+            @RequestParam(defaultValue = "20") int size,
+            Principal principal
+    ) {
+        return centralKitchenService.getProducts(search, category, page, size, principal);
+    }
+
+    @GetMapping("/inventory/products")
+    @PageResponse
+    @ApiResponse(message = "Kitchen product inventory retrieved successfully")
+    @SecuredEndpoint("PRODUCTION_PLAN_VIEW")
+    @Operation(
+            summary = "Xem tồn kho thành phẩm bếp",
+            description = "Kitchen staff xem số lượng thành phẩm đang lưu tại bếp, chi tiết theo từng lô sản xuất. " +
+                    "Hỗ trợ lọc theo productId hoặc productName."
+    )
+    public Object getProductInventory(
+            @Parameter(description = "Product ID filter", example = "PROD001")
+            @RequestParam(required = false) String productId,
+            @Parameter(description = "Product name filter", example = "Bánh")
+            @RequestParam(required = false) String productName,
+            @Parameter(description = "Page index (0-based)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "20")
+            @RequestParam(defaultValue = "20") int size,
+            Principal principal
+    ) {
+        return centralKitchenService.getProductInventory(productId, productName, page, size, principal);
+    }
 }

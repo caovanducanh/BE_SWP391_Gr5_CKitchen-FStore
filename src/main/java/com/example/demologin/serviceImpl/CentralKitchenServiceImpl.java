@@ -13,6 +13,11 @@ import com.example.demologin.dto.response.BatchResponse;
 import com.example.demologin.dto.response.BatchIngredientUsageResponse;
 import com.example.demologin.dto.response.PlanIngredientResponse;
 import com.example.demologin.dto.response.KitchenInventoryDetailResponse;
+import com.example.demologin.dto.response.KitchenProductInventoryResponse;
+import com.example.demologin.dto.response.ProductResponse;
+import com.example.demologin.enums.ProductCategory;
+import com.example.demologin.mapper.ProductMapper;
+import org.springframework.data.domain.PageImpl;
 import com.example.demologin.entity.Batch;
 import com.example.demologin.entity.Ingredient;
 import com.example.demologin.entity.IngredientBatch;
@@ -59,6 +64,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -114,6 +120,7 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
     private final PlanIngredientBatchUsageRepository planIngredientBatchUsageRepository;
     private final BatchRepository batchRepository;
     private final IngredientBatchService ingredientBatchService;
+    private final ProductMapper productMapper;
 
     @Override
     public Page<OrderResponse> getAllOrders(String status, String storeId, int page, int size, Principal principal) {
@@ -457,7 +464,10 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
     public Page<BatchResponse> getProductBatches(String productId, String status, int page, int size, Principal principal) {
         User currentUser = getCurrentCentralKitchenStaff(principal);
         Kitchen kitchen = currentUser.getKitchen();
-        
+        if (kitchen == null) {
+            throw new BadRequestException("Central kitchen staff is not assigned to any kitchen");
+        }
+
         Specification<Batch> spec = Specification.where((root, q, cb) -> cb.equal(root.get("kitchen").get("id"), kitchen.getId()));
         if (productId != null && !productId.isBlank()) {
             spec = spec.and((root, q, cb) -> cb.equal(root.get("product").get("id"), productId.trim()));
@@ -485,6 +495,72 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
     @Override
     public Page<KitchenInventoryDetailResponse> getInventory(String ingredientId, String ingredientName, Boolean lowStock, int page, int size, Principal principal) {
         return ingredientBatchService.getInventory(ingredientId, ingredientName, lowStock, page, size, principal);
+    }
+
+    @Override
+    public Page<ProductResponse> getProducts(String search, String category, int page, int size, Principal principal) {
+        validateCentralKitchenStaff(principal);
+
+        String normalizedSearch = normalizeText(search);
+        ProductCategory parsedCategory = parseProductCategory(category);
+
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name"));
+        return productRepository.searchProducts(normalizedSearch, parsedCategory, pageRequest)
+                .map(productMapper::toResponse);
+    }
+
+    @Override
+    public Page<KitchenProductInventoryResponse> getProductInventory(String productId, String productName, int page, int size, Principal principal) {
+        validateCentralKitchenStaff(principal);
+        User currentUser = getCurrentCentralKitchenStaff(principal);
+        Kitchen kitchen = currentUser.getKitchen();
+        if (kitchen == null) {
+            throw new BadRequestException("Central kitchen staff is not assigned to any kitchen");
+        }
+
+        Specification<Batch> spec = Specification.where((root, query, cb) -> cb.equal(root.get("kitchen").get("id"), kitchen.getId()));
+        spec = spec.and((root, query, cb) -> root.get("status").in(List.of("AVAILABLE", "PARTIALLY_DISTRIBUTED")));
+
+        if (productId != null && !productId.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("product").get("id"), productId.trim()));
+        }
+        if (productName != null && !productName.isBlank()) {
+            String keyword = "%" + productName.trim().toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("product").get("name")), keyword));
+        }
+
+        List<Batch> activeBatches = batchRepository.findAll(spec);
+
+        Map<Product, List<Batch>> grouped = activeBatches.stream()
+                .collect(Collectors.groupingBy(Batch::getProduct));
+
+        List<KitchenProductInventoryResponse> results = grouped.entrySet().stream()
+                .map(entry -> {
+                    Product p = entry.getKey();
+                    List<Batch> batches = entry.getValue();
+                    int total = batches.stream().mapToInt(Batch::getRemainingQuantity).sum();
+
+                    return KitchenProductInventoryResponse.builder()
+                            .productId(p.getId())
+                            .productName(p.getName())
+                            .totalRemainingQuantity(total)
+                            .unit(p.getUnit())
+                            .batches(batches.stream().map(b -> KitchenProductInventoryResponse.ProductBatchDetailResponse.builder()
+                                    .batchId(b.getId())
+                                    .remainingQuantity(b.getRemainingQuantity())
+                                    .expiryDate(b.getExpiryDate())
+                                    .status(b.getStatus())
+                                    .build()).toList())
+                            .build();
+                })
+                .sorted(Comparator.comparing(KitchenProductInventoryResponse::getProductName))
+                .toList();
+
+        int start = Math.min((int) PageRequest.of(page, size).getOffset(), results.size());
+        int end = Math.min((start + size), results.size());
+        List<KitchenProductInventoryResponse> paginatedResults = results.subList(start, end);
+
+        return new PageImpl<>(paginatedResults, PageRequest.of(page, size), results.size());
     }
 
     @Override
@@ -652,6 +728,18 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
             return OrderStatus.valueOf(value.toUpperCase());
         } catch (IllegalArgumentException ex) {
             throw new BadRequestException("Invalid order status: " + status);
+        }
+    }
+
+    private ProductCategory parseProductCategory(String category) {
+        String value = normalizeText(category);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return ProductCategory.valueOf(value.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Invalid product category: " + category);
         }
     }
 

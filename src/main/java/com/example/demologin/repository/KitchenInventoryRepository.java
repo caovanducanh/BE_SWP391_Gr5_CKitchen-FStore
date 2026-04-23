@@ -3,6 +3,7 @@ package com.example.demologin.repository;
 import com.example.demologin.entity.KitchenInventory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -31,4 +32,8 @@ public interface KitchenInventoryRepository extends JpaRepository<KitchenInvento
         where k.kitchen.id = :kitchenId and k.totalQuantity <= k.minStock
         """)
     long countLowStockItemsByKitchenId(@Param("kitchenId") String kitchenId);
+
+    @Modifying
+    @Query("delete from KitchenInventory k where k.ingredient.id in :ids")
+    void deleteByIngredient_IdIn(@Param("ids") List<String> ids);
 }

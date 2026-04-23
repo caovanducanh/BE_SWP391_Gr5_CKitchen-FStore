@@ -29,6 +29,8 @@ public interface CentralKitchenService {
 
     // Inventory (dùng IngredientBatchService)
     Page<KitchenInventoryDetailResponse> getInventory(String ingredientId, String ingredientName, Boolean lowStock, int page, int size, Principal principal);
+    Page<ProductResponse> getProducts(String search, String category, int page, int size, Principal principal);
+    Page<KitchenProductInventoryResponse> getProductInventory(String productId, String productName, int page, int size, Principal principal);
 
     Page<StoreResponse> getStores(String name, String status, int page, int size, Principal principal);
     KitchenResponse getMyKitchen(Principal principal);

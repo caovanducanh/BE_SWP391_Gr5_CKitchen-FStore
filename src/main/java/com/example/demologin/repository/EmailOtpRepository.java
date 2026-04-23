@@ -4,6 +4,7 @@ import com.example.demologin.entity.EmailOtp;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -18,5 +19,5 @@ public interface EmailOtpRepository extends JpaRepository<EmailOtp, Long> {
     
     @Modifying
     @Query("DELETE FROM EmailOtp e WHERE e.expiredAt < :currentTime")
-    int deleteExpiredOtps(LocalDateTime currentTime);
+    int deleteExpiredOtps(@Param("currentTime") LocalDateTime currentTime);
 } 

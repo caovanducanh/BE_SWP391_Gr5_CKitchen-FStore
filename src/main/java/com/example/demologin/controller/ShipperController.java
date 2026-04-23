@@ -40,9 +40,9 @@ public class ShipperController {
     )
     public Object getAvailableOrders(
             @Parameter(description = "Page index (0-based)", example = "0")
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(name = "page", defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "20")
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(name = "size", defaultValue = "20") int size,
             Principal principal
     ) {
         return shipperService.getAvailableOrders(page, size, principal);
@@ -67,7 +67,7 @@ public class ShipperController {
                         description = "Đánh dấu delivery đã giao tới cửa hàng thành công và chuyển sang trạng thái chờ store staff xác nhận nhận đơn."
         )
         public Object markDeliverySuccess(
-                        @PathVariable String deliveryId,
+                        @PathVariable(name = "deliveryId") String deliveryId,
                         @RequestBody(required = false) MarkDeliverySuccessRequest request,
                         Principal principal
         ) {
@@ -84,9 +84,9 @@ public class ShipperController {
     )
     public Object getMyDeliveries(
             @Parameter(description = "Page index (0-based)", example = "0")
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(name = "page", defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "20")
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(name = "size", defaultValue = "20") int size,
             Principal principal
     ) {
         return shipperService.getMyDeliveries(page, size, principal);
@@ -99,7 +99,7 @@ public class ShipperController {
             summary = "Xem ai đang cầm đơn",
             description = "Tra cứu shipper đang giữ đơn giao theo order."
     )
-    public Object getOrderHolder(@PathVariable String orderId, Principal principal) {
+    public Object getOrderHolder(@PathVariable(name = "orderId") String orderId, Principal principal) {
         return shipperService.getOrderHolder(orderId, principal);
     }
 }

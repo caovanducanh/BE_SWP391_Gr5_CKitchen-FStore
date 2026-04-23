@@ -36,13 +36,13 @@ public class CentralKitchenController {
     )
     public Object getOrders(
             @Parameter(description = "Order status filter", example = "PENDING")
-            @RequestParam(required = false) String status,
-            @Parameter(description = "Store ID filter", example = "ST001")
-            @RequestParam(required = false) String storeId,
+            @RequestParam(name = "status", required = false) String status,
+            @Parameter(description = "Store ID to filter", example = "STR001")
+            @RequestParam(name = "storeId", required = false) String storeId,
             @Parameter(description = "Page index (0-based)", example = "0")
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(name = "page", defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "20")
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(name = "size", defaultValue = "20") int size,
             Principal principal
     ) {
         return centralKitchenService.getAllOrders(status, storeId, page, size, principal);
@@ -55,7 +55,7 @@ public class CentralKitchenController {
                         summary = "Chi tiết đơn hàng",
                         description = "Kitchen staff xem chi tiết một đơn hàng để xử lý chính xác."
         )
-        public Object getOrderById(@PathVariable String orderId, Principal principal) {
+        public Object getOrderById(@PathVariable(name = "orderId") String orderId, Principal principal) {
                 return centralKitchenService.getOrderById(orderId, principal);
         }
 
@@ -67,7 +67,7 @@ public class CentralKitchenController {
             description = "Tiếp nhận đơn từ cửa hàng và tự động gán vào bếp theo kitchen đã được gán cho tài khoản nhân viên đăng nhập (status -> ASSIGNED)."
     )
     public Object assignOrder(
-            @PathVariable String orderId,
+            @PathVariable(name = "orderId") String orderId,
             Principal principal
     ) {
         return centralKitchenService.assignOrder(orderId, principal);
@@ -85,7 +85,7 @@ public class CentralKitchenController {
                     "Trường notes là optional (có thể null)."
     )
     public Object updateOrderStatus(
-            @PathVariable String orderId,
+            @PathVariable(name = "orderId") String orderId,
             @Valid @RequestBody UpdateOrderStatusRequest request,
             Principal principal
     ) {
@@ -102,9 +102,9 @@ public class CentralKitchenController {
     )
     public Object getProductionPlans(
             @Parameter(description = "Page index (0-based)", example = "0")
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(name = "page", defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "20")
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(name = "size", defaultValue = "20") int size,
             Principal principal
     ) {
         return centralKitchenService.getProductionPlans(page, size, principal);
@@ -134,15 +134,15 @@ public class CentralKitchenController {
     )
     public Object getInventory(
             @Parameter(description = "Ingredient ID filter", example = "ING001")
-            @RequestParam(required = false) String ingredientId,
+            @RequestParam(name = "ingredientId", required = false) String ingredientId,
             @Parameter(description = "Ingredient name filter", example = "Bột")
-            @RequestParam(required = false) String ingredientName,
+            @RequestParam(name = "ingredientName", required = false) String ingredientName,
             @Parameter(description = "Lọc sản phẩm sắp hết (<= minStock)")
-            @RequestParam(required = false) Boolean lowStock,
+            @RequestParam(name = "lowStock", required = false) Boolean lowStock,
             @Parameter(description = "Page index (0-based)", example = "0")
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(name = "page", defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "20")
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(name = "size", defaultValue = "20") int size,
             Principal principal
     ) {
         return centralKitchenService.getInventory(ingredientId, ingredientName, lowStock, page, size, principal);
@@ -152,7 +152,7 @@ public class CentralKitchenController {
     @ApiResponse(message = "Production plan retrieved successfully")
     @SecuredEndpoint("PRODUCTION_PLAN_VIEW")
     @Operation(summary = "Chi tiết kế hoạch sản xuất")
-    public Object getProductionPlanById(@PathVariable String planId, Principal principal) {
+    public Object getProductionPlanById(@PathVariable(name = "planId") String planId, Principal principal) {
         return centralKitchenService.getProductionPlanById(planId, principal);
     }
 
@@ -160,7 +160,7 @@ public class CentralKitchenController {
     @ApiResponse(message = "Production plan started successfully")
     @SecuredEndpoint("PRODUCTION_PLAN_UPDATE")
     @Operation(summary = "Bắt đầu sản xuất", description = "Chuyển kế hoạch sang IN_PRODUCTION và tự động trừ kho nguyên liệu (từ các lô đã tính toán).")
-    public Object startProductionPlan(@PathVariable String planId, Principal principal) {
+    public Object startProductionPlan(@PathVariable(name = "planId") String planId, Principal principal) {
         return centralKitchenService.startProductionPlan(planId, principal);
     }
 
@@ -168,7 +168,7 @@ public class CentralKitchenController {
     @ApiResponse(message = "Production plan completed successfully")
     @SecuredEndpoint("PRODUCTION_PLAN_UPDATE")
     @Operation(summary = "Hoàn thành sản xuất", description = "Chuyển kế hoạch sang COMPLETED, ghi nhận số lượng lô thành phẩm được sinh ra.")
-    public Object completeProductionPlan(@PathVariable String planId, @Valid @RequestBody CompletePlanRequest request, Principal principal) {
+    public Object completeProductionPlan(@PathVariable(name = "planId") String planId, @Valid @RequestBody CompletePlanRequest request, Principal principal) {
         return centralKitchenService.completeProductionPlan(planId, request.getNotes(), request.getExpiryDate(), principal);
     }
 
@@ -176,7 +176,7 @@ public class CentralKitchenController {
     @ApiResponse(message = "Production plan cancelled successfully")
     @SecuredEndpoint("PRODUCTION_PLAN_UPDATE")
     @Operation(summary = "Hủy kế hoạch sản xuất", description = "Chuyển sang CANCELLED, nếu đang IN_PRODUCTION thì hoàn lại nguyên liệu.")
-    public Object cancelProductionPlan(@PathVariable String planId, @Valid @RequestBody CancelPlanRequest request, Principal principal) {
+    public Object cancelProductionPlan(@PathVariable(name = "planId") String planId, @Valid @RequestBody CancelPlanRequest request, Principal principal) {
         return centralKitchenService.cancelProductionPlan(planId, request.getNotes(), principal);
     }
     
@@ -186,10 +186,10 @@ public class CentralKitchenController {
     @SecuredEndpoint("PRODUCTION_PLAN_VIEW")
     @Operation(summary = "Danh sách lô thành phẩm")
     public Object getProductBatches(
-            @RequestParam(required = false) String productId,
-            @RequestParam(required = false) String status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(name = "productId", required = false) String productId,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size,
             Principal principal) {
         return centralKitchenService.getProductBatches(productId, status, page, size, principal);
     }
@@ -198,7 +198,7 @@ public class CentralKitchenController {
     @ApiResponse(message = "Product batch retrieved successfully")
     @SecuredEndpoint("PRODUCTION_PLAN_VIEW")
     @Operation(summary = "Chi tiết lô thành phẩm", description = "Xem lô thành phẩm và traceability nguyên liệu cấu thành.")
-    public Object getProductBatchById(@PathVariable String batchId, Principal principal) {
+    public Object getProductBatchById(@PathVariable(name = "batchId") String batchId, Principal principal) {
         return centralKitchenService.getProductBatchById(batchId, principal);
     }
 
@@ -234,9 +234,9 @@ public class CentralKitchenController {
     )
     public Object getOverview(
             @Parameter(description = "Filter từ ngày requestedDate (yyyy-MM-dd)", example = "2026-04-01")
-            @RequestParam(required = false) LocalDate fromDate,
+            @RequestParam(name = "fromDate", required = false) LocalDate fromDate,
             @Parameter(description = "Filter đến ngày requestedDate (yyyy-MM-dd)", example = "2026-04-30")
-            @RequestParam(required = false) LocalDate toDate,
+            @RequestParam(name = "toDate", required = false) LocalDate toDate,
             Principal principal
     ) {
         return centralKitchenService.getOverview(fromDate, toDate, principal);
@@ -308,5 +308,31 @@ public class CentralKitchenController {
             Principal principal
     ) {
         return centralKitchenService.getProductInventory(productId, productName, page, size, principal);
+    }
+    @GetMapping("/products/{productId}/recipe-check")
+    @ApiResponse(message = "Recipe availability checked successfully")
+    @SecuredEndpoint("PRODUCTION_PLAN_CREATE")
+    @Operation(
+            summary = "Kiểm tra khả năng sản xuất (Công thức)",
+            description = "Kitchen staff kiểm tra xem với số lượng sản phẩm mong muốn thì trong kho có đủ nguyên liệu theo công thức không. " +
+                    "Tính toán chính xác theo BigDecimal để tránh sai số."
+    )
+    public Object checkRecipeAvailability(
+            @PathVariable(name = "productId") String productId,
+            @Parameter(description = "Số lượng sản phẩm muốn sản xuất", example = "100")
+            @RequestParam(name = "quantity") Integer quantity,
+            Principal principal
+    ) {
+        return centralKitchenService.checkRecipeAvailability(productId, quantity, principal);
+    }
+    @PatchMapping("/product-batches/{batchId}")
+    @ApiResponse(message = "Product batch updated successfully")
+    @SecuredEndpoint("PRODUCTION_PLAN_UPDATE")
+    @Operation(summary = "Cập nhật lô thành phẩm", description = "Kitchen staff cập nhật thông tin lô thành phẩm (hạn sử dụng, trạng thái, ghi chú).")
+    public Object updateBatch(
+            @PathVariable(name = "batchId") String batchId,
+            @Valid @RequestBody com.example.demologin.dto.request.centralkitchen.UpdateBatchRequest request,
+            Principal principal) {
+        return centralKitchenService.updateBatch(batchId, request, principal);
     }
 }

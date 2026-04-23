@@ -78,6 +78,7 @@ public class PermissionRoleInitializer {
     private static final String ORDER_STATUS_UPDATE = "ORDER_STATUS_UPDATE";
     private static final String PRODUCTION_PLAN_VIEW = "PRODUCTION_PLAN_VIEW";
     private static final String PRODUCTION_PLAN_CREATE = "PRODUCTION_PLAN_CREATE";
+    private static final String PRODUCTION_PLAN_UPDATE = "PRODUCTION_PLAN_UPDATE";
     private static final String KITCHEN_INVENTORY_VIEW = "KITCHEN_INVENTORY_VIEW";
     private static final String SYSTEM_CONFIG_MANAGE = "SYSTEM_CONFIG_MANAGE";
     private static final String FRANCHISE_STORE_MANAGE = "FRANCHISE_STORE_MANAGE";
@@ -157,6 +158,7 @@ public class PermissionRoleInitializer {
                 ensurePermission(ORDER_STATUS_UPDATE, "Cập nhật trạng thái đơn hàng vận hành bếp");
                 ensurePermission(PRODUCTION_PLAN_VIEW, "Xem kế hoạch sản xuất");
                 ensurePermission(PRODUCTION_PLAN_CREATE, "Tạo kế hoạch sản xuất");
+                ensurePermission(PRODUCTION_PLAN_UPDATE, "Cập nhật và điều hành kế hoạch sản xuất");
                 ensurePermission(KITCHEN_INVENTORY_VIEW, "Xem tồn kho nguyên liệu bếp trung tâm");
                 ensurePermission(SYSTEM_CONFIG_MANAGE, "Quản lý cấu hình hệ thống và tham số vận hành");
                 ensurePermission(FRANCHISE_STORE_MANAGE, "Quản lý danh mục cửa hàng franchise");
@@ -233,6 +235,7 @@ public class PermissionRoleInitializer {
         centralKitchenPerms.add(permMap.get(ORDER_STATUS_UPDATE));
         centralKitchenPerms.add(permMap.get(PRODUCTION_PLAN_VIEW));
         centralKitchenPerms.add(permMap.get(PRODUCTION_PLAN_CREATE));
+        centralKitchenPerms.add(permMap.get(PRODUCTION_PLAN_UPDATE));
         centralKitchenPerms.add(permMap.get(KITCHEN_INVENTORY_VIEW));
         centralKitchenPerms.add(permMap.get(STORE_VIEW));
         ensureRole(ROLE_CENTRAL_KITCHEN_STAFF, centralKitchenPerms);

@@ -2,19 +2,8 @@ package com.example.demologin.serviceImpl;
 
 import com.example.demologin.dto.request.centralkitchen.CreateProductionPlanRequest;
 import com.example.demologin.dto.request.centralkitchen.UpdateOrderStatusRequest;
-import com.example.demologin.dto.response.CentralKitchenOverviewResponse;
+import com.example.demologin.dto.response.*;
 
-import com.example.demologin.dto.response.KitchenResponse;
-import com.example.demologin.dto.response.OrderItemResponse;
-import com.example.demologin.dto.response.OrderResponse;
-import com.example.demologin.dto.response.ProductionPlanResponse;
-import com.example.demologin.dto.response.StoreResponse;
-import com.example.demologin.dto.response.BatchResponse;
-import com.example.demologin.dto.response.BatchIngredientUsageResponse;
-import com.example.demologin.dto.response.PlanIngredientResponse;
-import com.example.demologin.dto.response.KitchenInventoryDetailResponse;
-import com.example.demologin.dto.response.KitchenProductInventoryResponse;
-import com.example.demologin.dto.response.ProductResponse;
 import com.example.demologin.enums.ProductCategory;
 import com.example.demologin.mapper.ProductMapper;
 import org.springframework.data.domain.PageImpl;
@@ -217,6 +206,10 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
                         "Invalid status transition from " + currentStatus + " to " + newStatus
                 );
             }
+            if (newStatus == OrderStatus.PACKED_WAITING_SHIPPER && currentStatus != OrderStatus.PACKED_WAITING_SHIPPER) {
+                handleProductDeductionOnPacking(order, principal);
+            }
+            
             order.setStatus(newStatus);
             markOrderStatusTimestamp(order, newStatus);
         }
@@ -308,7 +301,9 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
             planIngredients.add(PlanIngredient.builder()
                     .plan(tempPlan)
                     .ingredient(recipe.getIngredient())
+                    .name(recipe.getIngredient().getName())
                     .quantity(requiredTotal)
+                    .qty(requiredTotal)
                     .unit(recipe.getUnit())
                     .createdAt(LocalDateTime.now())
                     .build());
@@ -935,5 +930,122 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
                 .createdAt(kitchen.getCreatedAt())
                 .updatedAt(kitchen.getUpdatedAt())
                 .build();
+    }
+    @Override
+    public RecipeCheckResponse checkRecipeAvailability(String productId, Integer quantity, Principal principal) {
+        validateCentralKitchenStaff(principal);
+        User currentUser = getCurrentCentralKitchenStaff(principal);
+        Kitchen kitchen = currentUser.getKitchen();
+        if (kitchen == null) {
+            throw new BadRequestException("Central kitchen staff is not assigned to any kitchen");
+        }
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new NotFoundException("Product not found: " + productId));
+
+        List<Recipe> recipes = recipeRepository.findAllByProduct_Id(productId);
+        if (recipes.isEmpty()) {
+            throw new BadRequestException("Recipe not defined for product: " + product.getName());
+        }
+
+        List<RecipeCheckResponse.IngredientCheckDetail> details = new ArrayList<>();
+        boolean canProduce = true;
+
+        for (Recipe recipe : recipes) {
+            Ingredient ingredient = recipe.getIngredient();
+            BigDecimal requiredQty = recipe.getQuantity().multiply(new BigDecimal(quantity));
+            
+            BigDecimal availableQty = kitchenInventoryRepository.findByKitchen_IdAndIngredient_Id(kitchen.getId(), ingredient.getId())
+                    .map(KitchenInventory::getTotalQuantity)
+                    .orElse(BigDecimal.ZERO);
+
+            boolean isSufficient = availableQty.compareTo(requiredQty) >= 0;
+            BigDecimal shortage = isSufficient ? BigDecimal.ZERO : requiredQty.subtract(availableQty);
+
+            if (!isSufficient) {
+                canProduce = false;
+            }
+
+            details.add(RecipeCheckResponse.IngredientCheckDetail.builder()
+                    .ingredientId(ingredient.getId())
+                    .ingredientName(ingredient.getName())
+                    .requiredQuantity(requiredQty)
+                    .availableQuantity(availableQty)
+                    .unit(recipe.getUnit())
+                    .isSufficient(isSufficient)
+                    .shortage(shortage)
+                    .build());
+        }
+
+        return RecipeCheckResponse.builder()
+                .productId(productId)
+                .productName(product.getName())
+                .requestedQuantity(quantity)
+                .ingredients(details)
+                .canProduce(canProduce)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public BatchResponse updateBatch(String batchId, com.example.demologin.dto.request.centralkitchen.UpdateBatchRequest request, Principal principal) {
+        validateCentralKitchenStaff(principal);
+        Batch batch = batchRepository.findById(batchId)
+                .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
+
+        if (request.getExpiryDate() != null) {
+            batch.setExpiryDate(request.getExpiryDate());
+        }
+        if (request.getStatus() != null) {
+            batch.setStatus(request.getStatus());
+        }
+        if (request.getNotes() != null) {
+            batch.setNotes(request.getNotes());
+        }
+        batch.setUpdatedAt(LocalDateTime.now());
+
+        return toBatchResponse(batchRepository.save(batch));
+    }
+
+    private void handleProductDeductionOnPacking(Order order, Principal principal) {
+        Kitchen kitchen = getCurrentCentralKitchenStaff(principal).getKitchen();
+        List<OrderItem> items = orderItemRepository.findByOrder_Id(order.getId());
+
+        for (OrderItem item : items) {
+            int quantityToDeduct = item.getQuantity();
+            String productId = item.getProduct().getId();
+
+            // Find all active batches for this product in this kitchen, sorted by expiry date (FEFO)
+            Specification<Batch> spec = Specification.where((root, query, cb) -> cb.equal(root.get("kitchen").get("id"), kitchen.getId()));
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("product").get("id"), productId));
+            spec = spec.and((root, query, cb) -> root.get("status").in(List.of("AVAILABLE", "PARTIALLY_DISTRIBUTED")));
+
+            List<Batch> batches = batchRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "expiryDate"));
+
+            int totalAvailable = batches.stream().mapToInt(Batch::getRemainingQuantity).sum();
+            if (totalAvailable < quantityToDeduct) {
+                throw new BadRequestException("Not enough product in inventory: " + item.getProduct().getName() + 
+                    ". Required: " + quantityToDeduct + ", Available: " + totalAvailable);
+            }
+
+            // Deduct from batches using FEFO
+            int remainingToDeduct = quantityToDeduct;
+            for (Batch batch : batches) {
+                if (remainingToDeduct <= 0) break;
+
+                int batchRemaining = batch.getRemainingQuantity();
+                if (batchRemaining <= remainingToDeduct) {
+                    remainingToDeduct -= batchRemaining;
+                    batch.setRemainingQuantity(0);
+                    batch.setStatus("DISTRIBUTED");
+                } else {
+                    batch.setRemainingQuantity(batchRemaining - remainingToDeduct);
+                    remainingToDeduct = 0;
+                    batch.setStatus("PARTIALLY_DISTRIBUTED");
+                }
+                batch.setUpdatedAt(LocalDateTime.now());
+                batchRepository.save(batch);
+            }
+        }
     }
 }

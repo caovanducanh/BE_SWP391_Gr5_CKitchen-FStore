@@ -2,10 +2,12 @@ package com.example.demologin.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
 @Getter
+@Setter
 @Builder
 public class DeliveryResponse {
     private String id;
@@ -20,6 +22,11 @@ public class DeliveryResponse {
     private String notes;
     private String receiverName;
     private Boolean temperatureOk;
+    private Double distance;
+    private String storeName;
+    private String storeAddress;
+    private Double storeLatitude;
+    private Double storeLongitude;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

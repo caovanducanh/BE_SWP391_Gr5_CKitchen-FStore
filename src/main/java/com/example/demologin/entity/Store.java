@@ -43,6 +43,10 @@ public class Store {
 
     private LocalDate openDate;
 
+    private Double latitude;
+
+    private Double longitude;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

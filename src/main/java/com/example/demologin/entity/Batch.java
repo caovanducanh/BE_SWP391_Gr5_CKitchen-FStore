@@ -50,7 +50,7 @@ public class Batch {
     private LocalDate expiryDate;
 
     /** AVAILABLE, PARTIALLY_DISTRIBUTED, FULLY_DISTRIBUTED */
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = 50)
     private String status;
 
     @Column(length = 100)

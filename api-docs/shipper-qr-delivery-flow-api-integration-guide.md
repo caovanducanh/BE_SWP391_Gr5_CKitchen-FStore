@@ -1,25 +1,25 @@
-# Shipper QR Delivery Flow API Integration Guide (FE)
+# Hướng dẫn tích hợp API Luồng giao nhận hàng qua mã QR cho Shipper (FE)
 
-Tai lieu nay mo ta day du luong giao nhan moi:
-- Dieu phoi vien sinh QR nhan don theo order
-- QR duoc dan len thung hang de shipper quet
-- He thong tu sinh deliveryId (ma van don) neu chua co
-- Shipper danh dau da giao thanh cong (cho cua hang xac nhan)
-- Store staff xac nhan da nhan don de chot don hoan tat
+Tài liệu này mô tả đầy đủ luồng giao nhận hàng mới:
+- Điều phối viên sinh mã QR nhận đơn theo từng đơn hàng (Order).
+- Mã QR được dán lên thùng hàng để Shipper quét nhận đơn.
+- Hệ thống tự động sinh mã vận đơn (deliveryId) nếu chưa có.
+- Shipper đánh dấu đã giao hàng thành công (chờ cửa hàng xác nhận).
+- Nhân viên cửa hàng (Store Staff) xác nhận đã nhận đơn để hoàn tất quy trình.
 
-Muc tieu: FE noi API theo dung thu tu, de hieu, khong can doan nghiep vu.
+**Mục tiêu**: Đội ngũ Frontend (FE) kết nối API theo đúng thứ tự, dễ hiểu và không cần phải đoán nghiệp vụ.
 
 ---
 
-## 1) Tong quan va pham vi
+## 1) Tổng quan và Phạm vi
 
-- Prefix Supply Coordinator: /api/supply-coordinator
-- Prefix Shipper: /api/shipper
-- Prefix Store Staff: /api/store
-- Auth: JWT Bearer token
-- Content-Type: application/json
+- **Prefix Điều phối viên (Supply Coordinator)**: `/api/supply-coordinator`
+- **Prefix Shipper**: `/api/shipper`
+- **Prefix Nhân viên cửa hàng (Store Staff)**: `/api/store`
+- **Xác thực (Auth)**: JWT Bearer token
+- **Content-Type**: `application/json`
 
-Response thanh cong:
+**Phản hồi thành công (Success Response):**
 
 ```json
 {
@@ -29,7 +29,7 @@ Response thanh cong:
 }
 ```
 
-Response loi:
+**Phản hồi lỗi (Error Response):**
 
 ```json
 {
@@ -41,48 +41,42 @@ Response loi:
 
 ---
 
-## 2) Trang thai chinh can map o FE
+## 2) Các trạng thái chính cần ánh xạ (Map) ở FE
 
-### 2.1) Delivery status
-- ASSIGNED
-- SHIPPING
-- DELAYED
-- WAITING_CONFIRM
-- DELIVERED
-- CANCELLED
+### 2.1) Trạng thái Vận đơn (Delivery status)
+- `ASSIGNED`: Đã được tạo, đang chờ shipper nhận.
+- `SHIPPING`: Shipper đang đi giao hàng.
+- `DELAYED`: Gặp sự cố (tùy chọn).
+- `WAITING_CONFIRM`: Shipper đã giao tới nơi, chờ cửa hàng xác nhận.
+- `DELIVERED`: Hoàn tất giao nhận.
+- `CANCELLED`: Đã hủy.
 
-### 2.2) Order status lien quan luong giao nhan
-- PACKED_WAITING_SHIPPER
-- SHIPPING
-- DELIVERED
-- CANCELLED
+### 2.2) Trạng thái Đơn hàng (Order status) liên quan
+- `PACKED_WAITING_SHIPPER`: Đã đóng gói, chờ shipper.
+- `SHIPPING`: Đang trong quá trình vận chuyển.
+- `DELIVERED`: Đã giao hàng xong.
+- `CANCELLED`: Đã hủy đơn.
 
-### 2.3) Y nghia moc thoi gian
-- pickedUpAt: luc shipper nhan don sau khi quet QR
-- deliveredAt: luc shipper bao da giao thanh cong (mark-success)
-- Store confirm KHONG ghi de deliveredAt neu da co
+### 2.3) Ý nghĩa các mốc thời gian
+- `pickedUpAt`: Lúc shipper nhận đơn sau khi quét mã QR thành công.
+- `deliveredAt`: Lúc shipper báo đã giao hàng thành công (qua nút mark-success).
 
 ---
 
-## 3) End-to-end flow cho FE
+## 3) Quy trình tích hợp chi tiết cho FE
 
-## Buoc 1: Dieu phoi vien sinh QR theo order
+### Bước 1: Điều phối viên sinh mã QR theo đơn hàng
 
-Endpoint:
-- Method: GET
-- URL: /api/supply-coordinator/orders/{orderId}/pickup-qr
-- Permission: SUPPLY_DELIVERY_VIEW
+**Endpoint:**
+- **Method**: `GET`
+- **URL**: `/api/supply-coordinator/orders/{orderId}/pickup-qr`
+- **Quyền (Permission)**: `SUPPLY_DELIVERY_VIEW`
 
-Muc dich:
-- Lay ma QR de dan len thung hang
-- Neu order chua co delivery thi backend tu tao delivery
-- deliveryId duoc sinh tai buoc nay neu can
+**Mục đích:**
+- Lấy mã QR để dán lên thùng hàng.
+- Nếu đơn hàng chưa có bản ghi giao hàng (delivery), backend sẽ tự động tạo mới.
 
-Dieu kien sinh moi delivery:
-- Order status phai la PACKED_WAITING_SHIPPER hoac SHIPPING
-
-Response data:
-
+**Dữ liệu phản hồi:**
 ```json
 {
   "orderId": "ORD002",
@@ -92,189 +86,87 @@ Response data:
 }
 ```
 
-Goi y FE:
-- In pickupQrCode thanh QR image
-- Hien deliveryId tren label van don
-- Luu mapping orderId <-> deliveryId de tra cuu nhanh
+---
+
+### Bước 2: (Tùy chọn) Shipper xem các đơn đang chờ nhận
+
+**Endpoint:**
+- **Method**: `GET`
+- **URL**: `/api/shipper/orders/available?page=0&size=20&lat=10.77&lon=106.7`
+- **Quyền**: `SHIPPER_DELIVERY_VIEW`
+
+**Mục đích:**
+- Hiển thị danh sách các đơn đã đóng gói, có thông tin giao hàng nhưng chưa có người nhận.
+- **Tính toán Khoảng cách**: Nếu truyền `lat` và `lon`, hệ thống sẽ tính khoảng cách (km) từ vị trí của shipper đến kho (Central Kitchen) và tự động sắp xếp đơn gần nhất lên đầu.
 
 ---
 
-## Buoc 2: (Optional) Shipper xem don dang cho nhan
+### Bước 3: Shipper quét mã QR để nhận đơn
 
-Endpoint:
-- Method: GET
-- URL: /api/shipper/orders/available?page=0&size=20
-- Permission: SHIPPER_DELIVERY_VIEW
-
-Muc dich:
-- Hien list don da dong goi, co delivery va chua co shipper cam
-
----
-
-## Buoc 3: Shipper quet QR de nhan don
-
-Endpoint:
-- Method: POST
-- URL: /api/shipper/deliveries/scan-qr
-- Permission: SHIPPER_DELIVERY_CLAIM
-- Body:
-
+**Endpoint:**
+- **Method**: `POST`
+- **URL**: `/api/shipper/deliveries/scan-qr`
+- **Quyền**: `SHIPPER_DELIVERY_CLAIM`
+- **Body**:
 ```json
 {
   "qrCode": "PK-ORD002-3D451097"
 }
 ```
 
-Backend cap nhat:
-- delivery.shipper = current shipper
-- delivery.pickedUpAt = now (neu chua co)
-- delivery.status = SHIPPING
-- order.status = SHIPPING
-- order.shippingAt = now (neu chua co)
+---
+
+### Bước 3.5: Shipper xem danh sách đơn mình đang nhận (My Deliveries)
+
+**Endpoint:**
+- **Method**: `GET`
+- **URL**: `/api/shipper/deliveries/my?page=0&size=20&lat=10.77&lon=106.7`
+- **Quyền**: `SHIPPER_DELIVERY_VIEW`
+
+**Mục đích:**
+- Xem lại các đơn hàng đã nhận và đang trong quá trình đi giao.
+- **Khoảng cách & Lộ trình**: Nếu truyền `lat` và `lon`, hệ thống sẽ tính khoảng cách thực tế (km) đến **Cửa hàng đích (Store)**.
+- **Thông tin chi tiết**: Mỗi mục trong danh sách bao gồm:
+    - `distance`: Khoảng cách thực tế đến cửa hàng (km).
+    - `storeName`, `storeAddress`: Tên và địa chỉ chi tiết nơi giao hàng.
+    - `storeLatitude`, `storeLongitude`: Tọa độ cửa hàng để mở bản đồ (Google Maps).
 
 ---
 
-## Buoc 4: Shipper bao da giao thanh cong (cho store confirm)
+### Bước 3.6: Xem chi tiết một vận đơn
 
-Endpoint:
-- Method: PATCH
-- URL: /api/shipper/deliveries/{deliveryId}/mark-success
-- Permission: SHIPPER_DELIVERY_UPDATE
-- Body (optional):
+**Endpoint:**
+- **Method**: `GET`
+- **URL**: `/api/shipper/deliveries/{deliveryId}`
+- **Quyền**: `SHIPPER_DELIVERY_VIEW`
 
-```json
-{
-  "notes": "Da ban giao tai cua hang"
-}
-```
-
-Backend cap nhat:
-- delivery.status = WAITING_CONFIRM
-- delivery.deliveredAt = now (neu chua co)
-- order.status = SHIPPING (van cho store staff xac nhan)
-
-Response data se co deliveredAt da duoc set.
+**Mục đích:**
+- Tra cứu nhanh thông tin chi tiết của một vận đơn cụ thể, bao gồm đầy đủ địa chỉ và tọa độ cửa hàng.
 
 ---
 
-## Buoc 5: Store staff xac nhan da nhan don
+### Bước 4: Shipper báo đã giao hàng thành công (Chờ cửa hàng xác nhận)
 
-Co 2 cach goi API, tuy context man hinh FE:
-
-### Cach A - Xac nhan theo order detail
-- Method: POST
-- URL: /api/store/orders/{orderId}/confirm-receipt
-- Permission: DELIVERY_CONFIRM
-
-### Cach B - Xac nhan theo delivery
-- Method: POST
-- URL: /api/store/deliveries/{deliveryId}/confirm
-- Permission: DELIVERY_CONFIRM
-
-Body (bat buoc):
-
+**Endpoint:**
+- **Method**: `PATCH`
+- **URL**: `/api/shipper/deliveries/{deliveryId}/mark-success`
+- **Quyền**: `SHIPPER_DELIVERY_UPDATE`
+- **Body (Tùy chọn)**:
 ```json
 {
-  "receiverName": "Nguyen Van A",
-  "temperatureOk": true,
-  "notes": "Nhan du so luong"
-}
-```
-
-Dieu kien backend cho xac nhan:
-- delivery.status phai la SHIPPING hoac WAITING_CONFIRM
-
-Backend cap nhat:
-- delivery.status = DELIVERED
-- order.status = DELIVERED
-- deliveredAt giu nguyen neu da co tu buoc mark-success
-
----
-
-## 4) API tra cuu ai dang cam don (holder)
-
-### 4.1) Cho dieu phoi vien
-- Method: GET
-- URL: /api/supply-coordinator/orders/{orderId}/holder
-- Permission: SUPPLY_DELIVERY_VIEW
-
-### 4.2) Cho shipper
-- Method: GET
-- URL: /api/shipper/orders/{orderId}/holder
-- Permission: SHIPPER_DELIVERY_VIEW
-
-Response data:
-
-```json
-{
-  "orderId": "ORD002",
-  "deliveryId": "DEL0421008",
-  "orderStatus": "SHIPPING",
-  "deliveryStatus": "WAITING_CONFIRM",
-  "pickupQrCode": "PK-ORD002-3D451097",
-  "holderUserId": 12,
-  "holderUsername": "shipper",
-  "holderFullName": "shipper Fullname",
-  "pickedUpAt": "2026-04-21T09:43:19.234103"
+  "notes": "Đã bàn giao hàng tại cửa hàng"
 }
 ```
 
 ---
 
-## 5) Sequence goi API de FE noi nhanh
+### Bước 5: Nhân viên cửa hàng xác nhận đã nhận hàng
 
-1. Supply UI: GET /api/supply-coordinator/orders/{orderId}/pickup-qr
-2. In/dan QR + hien deliveryId tren thung hang
-3. Shipper app: POST /api/shipper/deliveries/scan-qr
-4. Shipper app: PATCH /api/shipper/deliveries/{deliveryId}/mark-success
-5. Store app: POST /api/store/orders/{orderId}/confirm-receipt (hoac /deliveries/{deliveryId}/confirm)
+**Endpoint:**
+- **Method**: `POST`
+- **URL**: `/api/store/orders/{orderId}/confirm-receipt`
+- **Quyền**: `STORE_ORDER_UPDATE`
 
----
-
-## 6) Loi thuong gap va cach xu ly FE
-
-### 6.1) 400 Cannot generate pickup QR when order status is ...
-Nguyen nhan:
-- Order chua den PACKED_WAITING_SHIPPER/SHIPPING
-
-Xu ly FE:
-- Disable nut Sinh QR khi order status khong hop le
-
-### 6.2) 400 This order is already claimed by another shipper
-Nguyen nhan:
-- QR da duoc shipper khac quet nhan
-
-Xu ly FE:
-- Show modal don da co nguoi nhan, refresh holder
-
-### 6.3) 400 Delivery is not ready for store confirmation
-Nguyen nhan:
-- Store confirm sai trang thai (khong phai SHIPPING/WAITING_CONFIRM)
-
-Xu ly FE:
-- Chi hien thi nut Xac nhan nhan hang khi status hop le
-
-### 6.4) 404 Delivery not found for order
-Nguyen nhan:
-- orderId sai hoac order chua co delivery
-
-Xu ly FE:
-- Goi lai API pickup-qr de tao delivery neu order du dieu kien
-
----
-
-## 7) Checklist UI/UX de de van hanh
-
-- Hien thi ca orderId, deliveryId, pickupQrCode tren man hinh dieu phoi
-- Co nut Copy QR code text de backup khi camera loi
-- Sau scan thanh cong, refresh holder panel ngay
-- Store dashboard co tab WAITING_CONFIRM de xu ly nhanh
-- Khi store confirm xong, disable nut confirm tranh double submit
-
----
-
-## 8) Tinh tuong thich
-
-Flow nay da backward-compatible:
-- Store van co the confirm tu SHIPPING
-- Neu da co delivery truoc do, pickup-qr se tai su dung delivery hien tai va bo sung QR neu thieu
+**Mô tả:**
+- Nhân viên tại cửa hàng kiểm tra hàng hóa và bấm nút xác nhận trên Dashboard của cửa hàng.
+- Thao tác này sẽ chuyển trạng thái của cả đơn hàng (Order) và vận đơn (Delivery) sang `DELIVERED`.

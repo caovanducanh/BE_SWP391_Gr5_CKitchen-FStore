@@ -792,9 +792,11 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
     }
 
     private String generateProductionPlanId() {
-        String datePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMdd"));
-        long count = productionPlanRepository.count() + 1;
-        return String.format("PLN%s%03d", datePart, count % 1000);
+        LocalDateTime now = LocalDateTime.now();
+        String datePart = now.format(DateTimeFormatter.ofPattern("yyMMdd"));
+        String timePart = now.format(DateTimeFormatter.ofPattern("HHmmss"));
+        int randomSuffix = new java.util.Random().nextInt(900) + 100;
+        return String.format("PLN-%s-%s-%d", datePart, timePart, randomSuffix);
     }
 
     private OrderResponse toOrderResponse(Order order, List<OrderItem> items) {
@@ -1041,7 +1043,7 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
                 } else {
                     batch.setRemainingQuantity(batchRemaining - remainingToDeduct);
                     remainingToDeduct = 0;
-                    batch.setStatus("PARTIALLY_DISTRIBUTED");
+                    batch.setStatus("PART_DIST");
                 }
                 batch.setUpdatedAt(LocalDateTime.now());
                 batchRepository.save(batch);

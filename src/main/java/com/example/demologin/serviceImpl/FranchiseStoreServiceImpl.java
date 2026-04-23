@@ -387,9 +387,11 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
     }
 
     private String generateOrderId() {
-        String datePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMdd"));
-        long count = orderRepository.count() + 1;
-        return String.format("ORD%s%03d", datePart, count % 1000);
+        LocalDateTime now = LocalDateTime.now();
+        String datePart = now.format(DateTimeFormatter.ofPattern("yyMMdd"));
+        String timePart = now.format(DateTimeFormatter.ofPattern("HHmmss"));
+        int randomSuffix = new java.util.Random().nextInt(900) + 100; // 3-digit random
+        return String.format("ORD-%s-%s-%d", datePart, timePart, randomSuffix);
     }
 
     private OrderResponse toOrderResponse(Order order, List<OrderItem> items) {

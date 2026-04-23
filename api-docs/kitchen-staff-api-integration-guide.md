@@ -1,219 +1,195 @@
-# Central Kitchen Staff API Master Documentation (FE Ready)
+# Central Kitchen Staff API Master Documentation (Full & 100% Accurate)
 
-Tài liệu này cung cấp chi tiết toàn bộ Request/Response và các luồng nghiệp vụ (Flow) chuẩn để Frontend có thể tích hợp ngay lập tức (Ready to connect).
+Tài liệu này là bản đặc tả kỹ thuật đầy đủ và chính xác nhất cho module Bếp Trung Tâm (Central Kitchen). Toàn bộ API đều được ánh chiếu trực tiếp từ mã nguồn hệ thống.
 
 ---
 
-## 1. Thông tin chung
+## 1. Thông tin Vận hành & Quy ước
 - **Base URL**: `/api/central-kitchen`
-- **Auth**: `Authorization: Bearer <JWT_TOKEN>`
-- **Response Format**: Toàn bộ dữ liệu được đóng gói trong `@ApiResponse`:
+- **Xác thực**: `Authorization: Bearer <JWT_TOKEN>` (Role: `CENTRAL_KITCHEN_STAFF`).
+- **Response chuẩn**:
 ```json
 {
   "statusCode": 200,
-  "message": "Thành công",
+  "message": "Thông báo thành công",
   "data": { ... }
 }
 ```
 
 ---
 
-## 2. Luồng Nghiệp vụ 1: Xử lý Đơn hàng (Order Fulfillment)
+## 2. Module QUẢN LÝ ĐƠN HÀNG (Order Management)
 
-Luồng này mô tả cách nhân viên bếp nhận đơn từ Cửa hàng và đóng gói hàng.
+Dành cho việc tiếp nhận và xử lý đơn đặt hàng từ các Franchise Store.
 
-### Bước 1: Xem danh sách đơn đang chờ (`PENDING`)
-- **API**: `GET /orders?status=PENDING&page=0&size=20`
-- **Response**:
-```json
-{
-  "data": {
-    "content": [
-      {
-        "id": "ORD0423001",
-        "storeName": "Store District 1",
-        "status": "PENDING",
-        "requestedDate": "2026-04-23",
-        "total": 500000.0,
-        "createdAt": "2026-04-23T10:00:00"
-      }
-    ],
-    "totalElements": 1,
-    "totalPages": 1
-  }
-}
-```
+### 2.1 Lấy danh sách đơn hàng
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/orders`
+- **Permission**: `ORDER_VIEW`
+- **Query Params**:
+  - `status`: Lọc theo trạng thái (`PENDING`, `ASSIGNED`, `IN_PROGRESS`, `PACKED_WAITING_SHIPPER`, `SHIPPING`, `DELIVERED`, `CANCELLED`).
+  - `storeId`: Lọc theo ID cửa hàng.
+  - `page` (Mặc định 0), `size` (Mặc định 20).
 
-### Bước 2: Nhận đơn về bếp của mình
-- **API**: `PATCH /orders/ORD0423001/assign`
-- **Hành vi**: Chuyển trạng thái sang `ASSIGNED`. Backend tự gán `kitchenId` của user hiện tại vào đơn.
+### 2.2 Xem chi tiết đơn hàng
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/orders/{orderId}`
+- **Permission**: `ORDER_VIEW`
 
-### Bước 3: Đóng gói xong (Trừ kho thành phẩm tự động)
-- **API**: `PATCH /orders/ORD0423001/status`
-- **Request Body**:
-```json
-{
-  "status": "PACKED_WAITING_SHIPPER",
-  "notes": "Đã đóng gói đủ 10 ổ bánh mì sừng bò"
-}
-```
-- **Hành vi quan trọng**: Tại bước này, hệ thống sẽ tự động quét các lô thành phẩm (`ProductBatch`) của bếp theo **FEFO** để trừ hàng.
-- **Nếu thiếu hàng (Response 400)**:
-```json
-{
-  "statusCode": 400,
-  "message": "Không đủ tồn kho thành phẩm cho sản phẩm BAKE001. Cần: 10, Còn: 2",
-  "data": null
-}
-```
+### 2.3 Tiếp nhận đơn hàng (Assign)
+- **Method**: `PATCH`
+- **URL**: `/api/central-kitchen/orders/{orderId}/assign`
+- **Permission**: `ORDER_ASSIGN`
+- **Nghiệp vụ**: Hệ thống tự động gán đơn vào bếp của nhân viên đang đăng nhập và đổi trạng thái sang `ASSIGNED`.
+
+### 2.4 Cập nhật trạng thái đơn hàng
+- **Method**: `PATCH`
+- **URL**: `/api/central-kitchen/orders/{orderId}/status`
+- **Permission**: `ORDER_STATUS_UPDATE`
+- **Body**: `{"status": "...", "notes": "..."}`
+- **Quan trọng**: Khi chuyển sang `PACKED_WAITING_SHIPPER`, hệ thống sẽ tự động trừ tồn kho các lô thành phẩm theo FEFO.
+
+### 2.5 Lấy danh sách Trạng thái hợp lệ
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/order-statuses`
+- **Permission**: `ORDER_STATUS_UPDATE`
 
 ---
 
-## 3. Luồng Nghiệp vụ 2: Sản xuất & Quản lý lô (Production & Batch)
+## 3. Module SẢN XUẤT (Production Planning)
 
-Sử dụng khi kho thành phẩm hết hàng hoặc cần làm bánh theo kế hoạch.
+Quy trình từ lập kế hoạch đến khi bánh ra lò vào kho.
 
-### Bước 1: Kiểm tra nhanh nguyên liệu (Pre-check)
-- **API**: `GET /production-plans/recipe-check?productId=PROD001&quantity=50`
-- **Response**:
-```json
-{
-  "data": {
-    "productId": "PROD001",
-    "productName": "Bánh Mì Sừng Bò",
-    "requestedQuantity": 50,
-    "hasEnough": true,
-    "ingredients": [
-      {
-        "name": "Bột mì BAKE",
-        "required": 5.0,
-        "available": 100.0,
-        "sufficient": true
-      }
-    ]
-  }
-}
-```
+### 3.1 Kiểm tra khả năng sản xuất (Recipe Check)
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/products/{productId}/recipe-check`
+- **Permission**: `PRODUCTION_PLAN_CREATE`
+- **Query Params**: `quantity` (Số lượng muốn sản xuất).
+- **Hành vi**: Kiểm tra xem kho nguyên liệu hiện tại có đủ để sản xuất số lượng này không.
 
-### Bước 2: Tạo kế hoạch sản xuất
-- **API**: `POST /production-plans`
-- **Request Body**:
-```json
-{
-  "productId": "PROD001",
-  "quantity": 50,
-  "startDate": "2026-04-23T14:00:00",
-  "endDate": "2026-04-23T18:00:00",
-  "notes": "Làm bánh bổ sung cho đơn hàng ORD0423001"
-}
-```
-- **Response**: Trả về `ProductionPlanResponse` với `id: "PLN0423005"`, trạng thái `DRAFT`.
+### 3.2 Tạo kế hoạch sản xuất
+- **Method**: `POST`
+- **URL**: `/api/central-kitchen/production-plans`
+- **Permission**: `PRODUCTION_PLAN_CREATE`
+- **Body**: `{"productId": "...", "quantity": 100, "startDate": "...", "endDate": "...", "notes": "..."}`
 
-### Bước 3: Bắt đầu làm (Trừ kho nguyên liệu thật)
-- **API**: `PATCH /production-plans/PLN0423005/start`
-- **Hành vi**: Trừ số lượng bột, bơ, trứng... từ các lô nguyên liệu có hạn dùng gần nhất. Trạng thái chuyển sang `IN_PRODUCTION`.
+### 3.3 Danh sách kế hoạch sản xuất
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/production-plans`
+- **Permission**: `PRODUCTION_PLAN_VIEW`
+- **Query Params**: `page`, `size`.
 
-### Bước 4: Hoàn tất (Nhập bánh vào kho)
-- **API**: `PATCH /production-plans/PLN0423005/complete`
-- **Request Body**:
-```json
-{
-  "expiryDate": "2026-04-30",
-  "notes": "Bánh ra lò thơm ngon, đúng tiêu chuẩn."
-}
-```
-- **Hành vi**: Trạng thái `COMPLETED`. Hệ thống sinh ra một lô thành phẩm mới (`PB...`) để sẵn sàng bán/giao.
+### 3.4 Bắt đầu sản xuất (Start)
+- **Method**: `PATCH`
+- **URL**: `/api/central-kitchen/production-plans/{planId}/start`
+- **Permission**: `PRODUCTION_PLAN_UPDATE`
+- **Hành vi**: Trừ kho nguyên liệu thật sự tại các lô đã được chỉ định.
+
+### 3.5 Hoàn thành sản xuất (Complete)
+- **Method**: `PATCH`
+- **URL**: `/api/central-kitchen/production-plans/{planId}/complete`
+- **Permission**: `PRODUCTION_PLAN_UPDATE`
+- **Body**: `{"notes": "...", "expiryDate": "yyyy-MM-dd"}`
+- **Hành vi**: Sinh ra Lô thành phẩm (`ProductBatch`) mới trong kho.
+
+### 3.6 Hủy kế hoạch sản xuất (Cancel)
+- **Method**: `PATCH`
+- **URL**: `/api/central-kitchen/production-plans/{planId}/cancel`
+- **Permission**: `PRODUCTION_PLAN_UPDATE`
+- **Hành vi**: Hoàn trả nguyên liệu về các lô cũ nếu kế hoạch đã Start.
 
 ---
 
-## 4. Chi tiết các Object DTO quan trọng
+## 4. Module QUẢN LÝ KHO THÀNH PHẨM (Product Inventory & Batches)
 
-### 4.1 ProductionPlanResponse (Chi tiết kế hoạch)
-Dùng cho màn hình chi tiết để FE hiển thị bảng nguyên liệu (Traceability).
-```json
-{
-  "id": "PLN0423005",
-  "productName": "Bánh Mì Sừng Bò",
-  "quantity": 50,
-  "unit": "ổ",
-  "status": "IN_PRODUCTION",
-  "ingredients": [
-    {
-      "ingredientId": "BAKE001",
-      "ingredientName": "Bột mì đa dụng",
-      "requiredQuantity": 10.0,
-      "availableQuantity": 150.0,
-      "unit": "kg",
-      "sufficient": true
-    }
-  ]
-}
-```
+Dành cho nhân viên kiểm soát lượng bánh đã sản xuất xong.
 
-### 4.2 IngredientBatchResponse (Lô nguyên liệu)
-Dùng cho màn hình Quản lý kho nguyên liệu.
-```json
-{
-  "id": "B-12345",
-  "batchNo": "LOT- tepung-01",
-  "ingredientName": "Bột mì",
-  "remainingQuantity": 45.5,
-  "unit": "kg",
-  "expiryDate": "2026-12-31",
-  "status": "ACTIVE",
-  "nearExpiry": false
-}
-```
+### 4.1 Xem tồn kho thành phẩm (Tổng hợp)
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/inventory/products`
+- **Permission**: `PRODUCTION_PLAN_VIEW`
+- **Query Params**: `productId`, `productName`, `page`, `size`.
+- **Dữ liệu trả về**: Tổng số lượng từng loại bánh hiện có tại bếp.
 
-### 4.3 BatchResponse (Lô thành phẩm)
-Dùng cho màn hình Quản lý lô bánh đã sản xuất.
-```json
-{
-  "id": "PB260423001",
-  "productName": "Bánh Mì Sừng Bò",
-  "quantity": 100,
-  "remainingQuantity": 80,
-  "status": "AVAILABLE",
-  "expiryDate": "2026-04-30",
-  "ingredientBatchUsages": [
-    {
-      "batchNo": "BOOST-12345",
-      "ingredientName": "Bột mì",
-      "quantityUsed": 20.0
-    }
-  ]
-}
-```
+### 4.2 Danh sách các lô thành phẩm (Chi tiết lô)
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/product-batches`
+- **Permission**: `PRODUCTION_PLAN_VIEW`
+- **Query Params**: `productId`, `status` (`AVAILABLE`, `DEPLETED`), `page`, `size`.
+
+### 4.3 Xem chi tiết một lô thành phẩm
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/product-batches/{batchId}`
+- **Permission**: `PRODUCTION_PLAN_VIEW`
+- **Hành vi**: Xem thông tin lô và danh sách các lô nguyên liệu (`ingredientBatchUsages`) cấu thành nên lô bánh này.
+
+### 4.4 Cập nhật thông tin lô thành phẩm
+- **Method**: `PATCH`
+- **URL**: `/api/central-kitchen/product-batches/{batchId}`
+- **Permission**: `PRODUCTION_PLAN_UPDATE`
+- **Body**: `{"expiryDate": "...", "status": "...", "notes": "..."}`
 
 ---
 
-## 5. Danh sách Permission tương ứng
-Frontend có thể dùng thông tin này để ẩn/hiện các nút bấm trên UI:
-- **Nút "Nhận đơn"**: Cần `ORDER_ASSIGN`.
-- **Nút "Cập nhật đơn"**: Cần `ORDER_STATUS_UPDATE`.
-- **Nút "Tạo kế hoạch"**: Cần `PRODUCTION_PLAN_CREATE`.
-- **Nút "Bắt đầu/Hoàn tất kế hoạch"**: Cần `PRODUCTION_PLAN_UPDATE`.
-- **Nút "Nhập kho"**: Cần `KITCHEN_INVENTORY_CREATE`.
+## 5. Module QUẢN LÝ KHO NGUYÊN LIỆU (Ingredient Inventory & Batches)
+
+Kiểm soát nguyên liệu đầu vào.
+
+### 5.1 Xem tồn kho nguyên liệu (Tổng hợp)
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/inventory`
+- **Permission**: `KITCHEN_INVENTORY_VIEW`
+- **Query Params**: `ingredientId`, `ingredientName`, `lowStock` (boolean), `page`, `size`.
+
+### 5.2 Nhập lô nguyên liệu mới
+- **Method**: `POST`
+- **URL**: `/api/central-kitchen/ingredient-batches`
+- **Permission**: `KITCHEN_INVENTORY_CREATE`
+- **Body**: `ImportIngredientBatchRequest` (Chi tiết: `ingredientId`, `batchNo`, `quantity`, `expiryDate`, `supplier`, `importPrice`).
+
+### 5.3 Danh sách các lô nguyên liệu
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/ingredient-batches`
+- **Permission**: `KITCHEN_INVENTORY_VIEW`
+- **Query Params**: `ingredientId`, `ingredientName`, `status`, `page`, `size`.
+
+### 5.4 Xem chi tiết một lô nguyên liệu
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/ingredient-batches/{id}`
+- **Permission**: `KITCHEN_INVENTORY_VIEW`
 
 ---
 
-## 6. Sơ đồ Luồng Công việc (Workflow)
+## 6. Module TIỆN ÍCH & TỔNG QUAN (Utility & Overview)
 
-```mermaid
-graph TD
-    A[Order PENDING] -->|Assign| B(Order ASSIGNED)
-    B -->|Check Inventory| C{Đủ hàng?}
-    C -->|Có| D[Update status: PACKED_WAITING_SHIPPER]
-    C -->|Không| E[Create Production Plan]
-    E -->|Start| F[In Production]
-    F -->|Complete| G[Product Batch Created]
-    G --> D
-    D -->|Shipper Scan QR| H[Order SHIPPING]
-    H -->|Shipper Mark Success| I[Order DELIVERED]
-```
+### 6.1 Tổng quan vận hành bếp (Dashboard)
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/overview`
+- **Permission**: `ORDER_VIEW`
+- **Query Params**: `fromDate`, `toDate`.
+- **Dữ liệu**: Số lượng đơn chờ, đơn đang làm, đơn quá hạn...
+
+### 6.2 Thông tin Bếp của tôi
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/my-kitchen`
+- **Permission**: `KITCHEN_INVENTORY_VIEW`
+
+### 6.3 Tra cứu danh sách Sản phẩm (Để lập kế hoạch)
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/products`
+- **Permission**: `PRODUCTION_PLAN_VIEW`
+- **Query Params**: `search`, `category`, `page`, `size`.
+
+### 6.4 Tra cứu danh sách Cửa hàng
+- **Method**: `GET`
+- **URL**: `/api/central-kitchen/stores`
+- **Permission**: `STORE_VIEW`
+- **Query Params**: `name`, `status`, `page`, `size`.
 
 ---
 
-**Ghi chú cuối**: 
-- Các trường ngày tháng sử dụng định dạng ISO: `yyyy-MM-dd'T'HH:mm:ss`.
-- Khi `statusCode` khác 200, hãy hiển thị nội dung `message` cho người dùng vì đó là lỗi nghiệp vụ đã được Backend xử lý.
+## 7. Checklist Tích hợp FE (Nghiệp vụ Quan trọng)
+- [ ] **Lập kế hoạch**: Gọi `GET /products/{id}/recipe-check` để kiểm tra tồn kho ảo trước khi gọi `POST /production-plans`.
+- [ ] **Sản xuất**: Nút "Bắt đầu" gọi API `/start`, nút "Hoàn tất" gọi API `/complete` (Bắt buộc truyền `expiryDate`).
+- [ ] **Đóng gói đơn hàng**: Khi đổi status đơn sang `PACKED_WAITING_SHIPPER`, nếu Backend trả lỗi 400, hãy hiển thị thông báo "Thiếu tồn kho thành phẩm" để nhân viên biết cần đi sản xuất thêm.
+- [ ] **Truy vết (Traceability)**: Trong màn hình chi tiết lô thành phẩm (`PB...`), luôn hiển thị danh sách `ingredientBatchUsages` để minh bạch nguồn gốc nguyên liệu.

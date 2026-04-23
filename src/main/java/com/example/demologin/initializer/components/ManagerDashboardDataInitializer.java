@@ -66,17 +66,28 @@ public class ManagerDashboardDataInitializer {
         log.info("Creating manager dashboard seed data...");
 
         // === Specific Cleanup for Legacy Init Plans ===
-        log.info("🧹 Removing legacy init plans (PLAN001-004)...");
+        log.info("🧹 Skipping legacy cleanup to preserve user data.");
+
+        // FORCE UPDATE Schema for MySQL (Hibernate update often fails on column length increases)
+        log.info("⚙️ Forcing database schema updates for column lengths...");
         try {
             entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 0").executeUpdate();
-            // Delete plans and batches that were part of the initial seed
-            entityManager.createNativeQuery("DELETE FROM production_plans WHERE id LIKE 'PLAN%'").executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM batches WHERE id LIKE 'BATCH%'").executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM orders WHERE id LIKE 'ORD%'").executeUpdate();
+            entityManager.createNativeQuery("ALTER TABLE `batches` MODIFY `status` VARCHAR(50)").executeUpdate();
+            entityManager.createNativeQuery("ALTER TABLE `production_plans` MODIFY `status` VARCHAR(50)").executeUpdate();
+            entityManager.createNativeQuery("ALTER TABLE `ingredient_batches` MODIFY `status` VARCHAR(50)").executeUpdate();
+            entityManager.createNativeQuery("ALTER TABLE `orders` MODIFY `id` VARCHAR(30)").executeUpdate();
+            entityManager.createNativeQuery("ALTER TABLE `order_items` MODIFY `order_id` VARCHAR(30)").executeUpdate();
+            entityManager.createNativeQuery("ALTER TABLE `deliveries` MODIFY `id` VARCHAR(30)").executeUpdate();
+            entityManager.createNativeQuery("ALTER TABLE `deliveries` MODIFY `order_id` VARCHAR(30)").executeUpdate();
             entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
-            log.info("✅ Legacy init plans removed successfully.");
+            
+            // Manual cleanup for faulty legacy delivery record
+            log.info("🧹 Removing faulty legacy delivery DEL0423001...");
+            entityManager.createNativeQuery("DELETE FROM `deliveries` WHERE `id` = 'DEL0423001'").executeUpdate();
+            
+            log.info("✅ Database schema forced updates and manual cleanup successful.");
         } catch (Exception e) {
-            log.warn("⚠️ Legacy cleanup failed: {}", e.getMessage());
+            log.warn("⚠️ Forced schema update warning (might already be updated): {}", e.getMessage());
             entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
         }
 
@@ -104,6 +115,9 @@ public class ManagerDashboardDataInitializer {
         ensureKitchenStaffAssignment(kitchen);
         Store store = ensureStore();
         Store store2 = ensureStore2();
+
+        // Update coordinates for existing records if they were null
+        updateCoordinatesIfNull();
 
         log.info("🥞 Finding baseline products...");
         Product product1 = productRepository.findById("PROD001")
@@ -146,6 +160,8 @@ public class ManagerDashboardDataInitializer {
                 .manager("manager")
                 .status("ACTIVE")
                 .openDate(LocalDate.now().minusMonths(3))
+                .latitude(10.7769)
+                .longitude(106.7037)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build()));
@@ -159,6 +175,8 @@ public class ManagerDashboardDataInitializer {
                 .phone("0902000002")
                 .capacity(500)
                 .status("ACTIVE")
+                .latitude(10.7686)
+                .longitude(106.6953)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build()));
@@ -172,6 +190,8 @@ public class ManagerDashboardDataInitializer {
                                 .phone("0902000003")
                                 .capacity(420)
                                 .status("ACTIVE")
+                                .latitude(10.8504)
+                                .longitude(106.7721)
                                 .createdAt(LocalDateTime.now())
                                 .updatedAt(LocalDateTime.now())
                                 .build()));
@@ -186,12 +206,45 @@ public class ManagerDashboardDataInitializer {
                                 .manager("manager")
                                 .status("ACTIVE")
                                 .openDate(LocalDate.now().minusMonths(2))
+                                .latitude(10.7412)
+                                .longitude(106.7118)
                                 .createdAt(LocalDateTime.now())
                                 .updatedAt(LocalDateTime.now())
                                 .build()));
         }
 
-        private void ensureKitchenStaffAssignment(Kitchen kitchen) {
+        private void updateCoordinatesIfNull() {
+        storeRepository.findById("ST001").ifPresent(s -> {
+            if (s.getLatitude() == null) {
+                s.setLatitude(10.7769);
+                s.setLongitude(106.7037);
+                storeRepository.save(s);
+            }
+        });
+        storeRepository.findById("ST002").ifPresent(s -> {
+            if (s.getLatitude() == null) {
+                s.setLatitude(10.7412);
+                s.setLongitude(106.7118);
+                storeRepository.save(s);
+            }
+        });
+        kitchenRepository.findById("KIT001").ifPresent(k -> {
+            if (k.getLatitude() == null) {
+                k.setLatitude(10.7686);
+                k.setLongitude(106.6953);
+                kitchenRepository.save(k);
+            }
+        });
+        kitchenRepository.findById("KIT002").ifPresent(k -> {
+            if (k.getLatitude() == null) {
+                k.setLatitude(10.8504);
+                k.setLongitude(106.7721);
+                kitchenRepository.save(k);
+            }
+        });
+    }
+
+    private void ensureKitchenStaffAssignment(Kitchen kitchen) {
                 boolean changed = false;
                 List<User> kitchenStaffUsers = userRepository.findAllByRole_Name("CENTRAL_KITCHEN_STAFF");
                 for (User staff : kitchenStaffUsers) {

@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 public class ProductionPlan {
 
     @Id
-    @Column(length = 10)
+    @Column(length = 30)
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -35,7 +35,7 @@ public class ProductionPlan {
     /**
      * Status flow: DRAFT -> APPROVED -> IN_PRODUCTION -> COMPLETED | CANCELLED
      */
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 50)
     private String status;
 
     @Column(nullable = false)

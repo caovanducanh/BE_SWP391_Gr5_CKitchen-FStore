@@ -23,8 +23,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 import java.security.Principal;
 import java.time.LocalDateTime;
@@ -34,6 +36,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ShipperServiceImpl implements ShipperService {
 
     private static final String ROLE_SHIPPER = "SHIPPER";
@@ -43,18 +46,68 @@ public class ShipperServiceImpl implements ShipperService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final UserRepository userRepository;
+    private final com.example.demologin.service.GeocodingService geocodingService;
 
     @Override
-    public Page<OrderResponse> getAvailableOrders(int page, int size, Principal principal) {
+    public Page<OrderResponse> getAvailableOrders(int page, int size, Double lat, Double lon, Principal principal) {
         validateShipper(principal);
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "assignedAt"));
 
-        return deliveryRepository.findByOrder_StatusAndShipperIsNull(OrderStatus.PACKED_WAITING_SHIPPER, pageRequest)
+        if (lat == null || lon == null) {
+            PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "assignedAt"));
+            Page<Delivery> deliveryPage = deliveryRepository.findByOrder_StatusAndShipperIsNull(OrderStatus.PACKED_WAITING_SHIPPER, pageRequest);
+            
+            List<OrderResponse> content = deliveryPage.stream()
+                    .map(delivery -> {
+                        try {
+                            return toOrderResponse(delivery.getOrder(), orderItemRepository.findByOrder_Id(delivery.getOrder().getId()));
+                        } catch (Exception e) {
+                            log.error("Error mapping delivery {} to order response: {}", delivery.getId(), e.getMessage());
+                            return null;
+                        }
+                    })
+                    .filter(java.util.Objects::nonNull)
+                    .collect(Collectors.toList());
+            
+            return new PageImpl<>(content, pageRequest, deliveryPage.getTotalElements());
+        }
+
+        List<Delivery> allDeliveries = deliveryRepository.findByOrder_StatusAndShipperIsNull(OrderStatus.PACKED_WAITING_SHIPPER);
+        List<OrderResponse> sortedResponses = allDeliveries.stream()
                 .map(delivery -> {
-                    Order order = delivery.getOrder();
-                    List<OrderItem> items = orderItemRepository.findByOrder_Id(order.getId());
-                    return toOrderResponse(order, items);
-                });
+                    try {
+                        Order order = delivery.getOrder();
+                        OrderResponse response = toOrderResponse(order, orderItemRepository.findByOrder_Id(order.getId()));
+                        try {
+                            if (order.getKitchen() != null) {
+                                Double kLat = order.getKitchen().getLatitude();
+                                Double kLon = order.getKitchen().getLongitude();
+                                if (kLat != null && kLon != null) {
+                                    response.setDistance(geocodingService.calculateDistance(lat, lon, kLat, kLon));
+                                }
+                            }
+                        } catch (Exception distEx) {
+                            log.warn("Distance calculation failed for delivery {}: {}", delivery.getId(), distEx.getMessage());
+                        }
+                        return response;
+                    } catch (Exception e) {
+                        log.error("Error mapping delivery {} to order response: {}", delivery.getId(), e.getMessage());
+                        return null;
+                    }
+                })
+                .filter(java.util.Objects::nonNull)
+                .sorted((r1, r2) -> {
+                    if (r1.getDistance() == null && r2.getDistance() == null) return 0;
+                    if (r1.getDistance() == null) return 1;
+                    if (r2.getDistance() == null) return -1;
+                    return r1.getDistance().compareTo(r2.getDistance());
+                })
+                .collect(Collectors.toList());
+
+        int start = Math.min(page * size, sortedResponses.size());
+        int end = Math.min((start + size), sortedResponses.size());
+        List<OrderResponse> pagedResponses = sortedResponses.subList(start, end);
+
+        return new PageImpl<>(pagedResponses, PageRequest.of(page, size), sortedResponses.size());
     }
 
     @Override
@@ -70,7 +123,16 @@ public class ShipperServiceImpl implements ShipperService {
         Delivery delivery = deliveryRepository.findByPickupQrCode(qrCode)
                 .orElseThrow(() -> new NotFoundException("Pickup QR not found"));
 
-        Order order = delivery.getOrder();
+        Order order;
+        try {
+            order = delivery.getOrder();
+            if (order == null) throw new NotFoundException("Order not found for delivery");
+            // Trigger proxy
+            order.getId();
+        } catch (Exception e) {
+            throw new NotFoundException("Order record is missing for this delivery");
+        }
+
         if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.DELIVERED) {
             throw new BadRequestException("Cannot claim order with status: " + order.getStatus());
         }
@@ -101,8 +163,10 @@ public class ShipperServiceImpl implements ShipperService {
         order.setUpdatedAt(now);
         order.setNotes(appendNote(order.getNotes(), "SHIPPER", shipper.getUsername(), "Claimed by QR: " + qrCode));
 
+        deliveryRepository.save(delivery);
         orderRepository.save(order);
-        return toDeliveryResponse(deliveryRepository.save(delivery));
+        
+        return toDeliveryResponse(delivery);
     }
 
     @Override
@@ -117,7 +181,15 @@ public class ShipperServiceImpl implements ShipperService {
             throw new BadRequestException("This delivery is not assigned to current shipper");
         }
 
-        Order order = delivery.getOrder();
+        Order order;
+        try {
+            order = delivery.getOrder();
+            if (order == null) throw new NotFoundException("Order not found for delivery");
+            order.getId();
+        } catch (Exception e) {
+            throw new NotFoundException("Order record is missing for this delivery");
+        }
+
         if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.DELIVERED) {
             throw new BadRequestException("Cannot update completed/cancelled order: " + order.getStatus());
         }
@@ -147,11 +219,45 @@ public class ShipperServiceImpl implements ShipperService {
     }
 
     @Override
-    public Page<DeliveryResponse> getMyDeliveries(int page, int size, Principal principal) {
+    public Page<DeliveryResponse> getMyDeliveries(int page, int size, Double lat, Double lon, Principal principal) {
         User shipper = getCurrentShipper(principal);
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "pickedUpAt"));
-        return deliveryRepository.findByShipper_UserId(shipper.getUserId(), pageRequest)
-                .map(this::toDeliveryResponse);
+
+        if (lat == null || lon == null) {
+            PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "pickedUpAt"));
+            return deliveryRepository.findByShipper_UserId(shipper.getUserId(), pageRequest)
+                    .map(this::toDeliveryResponse);
+        }
+
+        List<Delivery> allDeliveries = deliveryRepository.findByShipper_UserId(shipper.getUserId());
+        List<DeliveryResponse> sortedResponses = allDeliveries.stream()
+                .map(delivery -> {
+                    DeliveryResponse response = toDeliveryResponse(delivery);
+                    try {
+                        Order order = delivery.getOrder();
+                        Store store = order.getStore();
+                        if (store != null && store.getLatitude() != null && store.getLongitude() != null) {
+                            response.setDistance(geocodingService.getDrivingDistance(lat, lon, store.getLatitude(), store.getLongitude()));
+                        } else {
+                            log.warn("Cannot calculate distance for delivery {}: Store or Store coordinates are null", delivery.getId());
+                        }
+                    } catch (Exception e) {
+                        log.error("Could not calculate distance for delivery {}: {}", delivery.getId(), e.getMessage());
+                    }
+                    return response;
+                })
+                .sorted((r1, r2) -> {
+                    if (r1.getDistance() == null && r2.getDistance() == null) return 0;
+                    if (r1.getDistance() == null) return 1;
+                    if (r2.getDistance() == null) return -1;
+                    return r1.getDistance().compareTo(r2.getDistance());
+                })
+                .collect(Collectors.toList());
+
+        int start = Math.min(page * size, sortedResponses.size());
+        int end = Math.min((start + size), sortedResponses.size());
+        List<DeliveryResponse> pagedResponses = sortedResponses.subList(start, end);
+
+        return new PageImpl<>(pagedResponses, PageRequest.of(page, size), sortedResponses.size());
     }
 
     @Override
@@ -176,6 +282,14 @@ public class ShipperServiceImpl implements ShipperService {
                 .holderFullName(holder != null ? holder.getFullName() : null)
                 .pickedUpAt(delivery.getPickedUpAt())
                 .build();
+    }
+
+    @Override
+    public DeliveryResponse getDeliveryById(String deliveryId, Principal principal) {
+        validateShipper(principal);
+        Delivery delivery = deliveryRepository.findById(deliveryId)
+                .orElseThrow(() -> new NotFoundException("Delivery not found: " + deliveryId));
+        return toDeliveryResponse(delivery);
     }
 
     private void validateShipper(Principal principal) {
@@ -246,9 +360,31 @@ public class ShipperServiceImpl implements ShipperService {
     }
 
     private DeliveryResponse toDeliveryResponse(Delivery delivery) {
+        String orderId = null;
+        String storeName = null;
+        String storeAddress = null;
+        Double storeLat = null;
+        Double storeLon = null;
+
+        try {
+            Order order = delivery.getOrder();
+            if (order != null) {
+                orderId = order.getId();
+                Store store = order.getStore();
+                if (store != null) {
+                    storeName = store.getName();
+                    storeAddress = store.getAddress();
+                    storeLat = store.getLatitude();
+                    storeLon = store.getLongitude();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not retrieve Order/Store info for delivery {}: {}", delivery.getId(), e.getMessage());
+        }
+
         return DeliveryResponse.builder()
                 .id(delivery.getId())
-                .orderId(delivery.getOrder().getId())
+                .orderId(orderId)
                 .coordinatorName(delivery.getCoordinator() != null ? delivery.getCoordinator().getFullName() : null)
                 .shipperName(delivery.getShipper() != null ? delivery.getShipper().getFullName() : null)
                 .status(delivery.getStatus())
@@ -259,6 +395,10 @@ public class ShipperServiceImpl implements ShipperService {
                 .notes(delivery.getNotes())
                 .receiverName(delivery.getReceiverName())
                 .temperatureOk(delivery.getTemperatureOk())
+                .storeName(storeName)
+                .storeAddress(storeAddress)
+                .storeLatitude(storeLat)
+                .storeLongitude(storeLon)
                 .createdAt(delivery.getCreatedAt())
                 .updatedAt(delivery.getUpdatedAt())
                 .build();

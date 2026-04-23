@@ -43,9 +43,13 @@ public class ShipperController {
             @RequestParam(name = "page", defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "20")
             @RequestParam(name = "size", defaultValue = "20") int size,
+            @Parameter(description = "Current Latitude of Shipper", example = "10.7769")
+            @RequestParam(name = "lat", required = false) Double lat,
+            @Parameter(description = "Current Longitude of Shipper", example = "106.7009")
+            @RequestParam(name = "lon", required = false) Double lon,
             Principal principal
     ) {
-        return shipperService.getAvailableOrders(page, size, principal);
+        return shipperService.getAvailableOrders(page, size, lat, lon, principal);
     }
 
     @PostMapping("/deliveries/scan-qr")
@@ -87,9 +91,13 @@ public class ShipperController {
             @RequestParam(name = "page", defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "20")
             @RequestParam(name = "size", defaultValue = "20") int size,
+            @Parameter(description = "Current Latitude of Shipper", example = "10.7769")
+            @RequestParam(name = "lat", required = false) Double lat,
+            @Parameter(description = "Current Longitude of Shipper", example = "106.7009")
+            @RequestParam(name = "lon", required = false) Double lon,
             Principal principal
     ) {
-        return shipperService.getMyDeliveries(page, size, principal);
+        return shipperService.getMyDeliveries(page, size, lat, lon, principal);
     }
 
     @GetMapping("/orders/{orderId}/holder")
@@ -101,5 +109,16 @@ public class ShipperController {
     )
     public Object getOrderHolder(@PathVariable(name = "orderId") String orderId, Principal principal) {
         return shipperService.getOrderHolder(orderId, principal);
+    }
+
+    @GetMapping("/deliveries/{deliveryId}")
+    @ApiResponse(message = "Delivery details retrieved successfully")
+    @SecuredEndpoint("SHIPPER_DELIVERY_VIEW")
+    @Operation(
+            summary = "Xem chi tiết vận đơn",
+            description = "Tra cứu thông tin chi tiết một lượt giao hàng bao gồm cả thông tin cửa hàng nhận."
+    )
+    public Object getDeliveryById(@PathVariable(name = "deliveryId") String deliveryId, Principal principal) {
+        return shipperService.getDeliveryById(deliveryId, principal);
     }
 }

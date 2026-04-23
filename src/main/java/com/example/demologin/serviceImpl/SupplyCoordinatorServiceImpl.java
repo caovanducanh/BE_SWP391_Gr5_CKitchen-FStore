@@ -607,9 +607,11 @@ public class SupplyCoordinatorServiceImpl implements SupplyCoordinatorService {
     }
 
     private String generateDeliveryId() {
-        String datePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMdd"));
-        long count = deliveryRepository.count() + 1;
-        return String.format("DEL%s%03d", datePart, count % 1000);
+        LocalDateTime now = LocalDateTime.now();
+        String datePart = now.format(DateTimeFormatter.ofPattern("yyMMdd"));
+        String timePart = now.format(DateTimeFormatter.ofPattern("HHmmss"));
+        int randomSuffix = new java.util.Random().nextInt(900) + 100;
+        return String.format("DEL-%s-%s-%d", datePart, timePart, randomSuffix);
     }
 
     private String generatePickupQrCode(String orderId) {

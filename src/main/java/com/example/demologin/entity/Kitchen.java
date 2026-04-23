@@ -39,6 +39,10 @@ public class Kitchen {
     @Column(nullable = false, length = 20)
     private String status;
 
+    private Double latitude;
+
+    private Double longitude;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

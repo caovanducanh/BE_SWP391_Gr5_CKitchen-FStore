@@ -19,7 +19,9 @@ public interface DeliveryRepository extends JpaRepository<Delivery, String> {
     Page<Delivery> findByCoordinator_UserId(Long coordinatorId, Pageable pageable);
     Page<Delivery> findByCoordinator_UserIdAndStatus(Long coordinatorId, String status, Pageable pageable);
     Page<Delivery> findByShipper_UserId(Long shipperId, Pageable pageable);
+    List<Delivery> findByShipper_UserId(Long shipperId);
     Page<Delivery> findByOrder_StatusAndShipperIsNull(com.example.demologin.enums.OrderStatus orderStatus, Pageable pageable);
+    List<Delivery> findByOrder_StatusAndShipperIsNull(com.example.demologin.enums.OrderStatus orderStatus);
     List<Delivery> findByOrder_IdIn(List<String> orderIds);
     long countByCoordinator_UserIdAndStatusIn(Long coordinatorId, Collection<String> statuses);
     long countByOrder_Store_IdAndStatusIn(String storeId, Collection<String> statuses);

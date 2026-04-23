@@ -1,4 +1,7 @@
 package com.example.demologin.entity;
+import java.util.List;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.CascadeType;
 
 import com.example.demologin.enums.OrderStatus;
 
@@ -31,7 +34,7 @@ import java.time.LocalDateTime;
 public class Order {
 
     @Id
-    @Column(length = 10)
+    @Column(length = 30)
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -77,4 +80,7 @@ public class Order {
     private LocalDateTime cancelledAt;
 
     private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderItem> items;
 }

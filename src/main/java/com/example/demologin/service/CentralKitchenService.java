@@ -26,6 +26,7 @@ public interface CentralKitchenService {
     // Product Batches (thành phẩm)
     Page<BatchResponse> getProductBatches(String productId, String status, int page, int size, Principal principal);
     BatchResponse getProductBatchById(String batchId, Principal principal);
+    BatchResponse updateBatch(String batchId, com.example.demologin.dto.request.centralkitchen.UpdateBatchRequest request, Principal principal);
 
     // Inventory (dùng IngredientBatchService)
     Page<KitchenInventoryDetailResponse> getInventory(String ingredientId, String ingredientName, Boolean lowStock, int page, int size, Principal principal);
@@ -36,4 +37,5 @@ public interface CentralKitchenService {
     KitchenResponse getMyKitchen(Principal principal);
     List<String> getOrderStatuses(Principal principal);
     CentralKitchenOverviewResponse getOverview(LocalDate fromDate, LocalDate toDate, Principal principal);
+    RecipeCheckResponse checkRecipeAvailability(String productId, Integer quantity, Principal principal);
 }

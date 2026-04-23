@@ -27,9 +27,15 @@ public class PlanIngredient {
     @JoinColumn(name = "ingredient_id", nullable = false)
     private Ingredient ingredient;
 
+    @Column(nullable = false, length = 100)
+    private String name;
+
     /** Số lượng nguyên liệu cần cho kế hoạch này (= recipe.quantity * plan.quantity) */
     @Column(nullable = false, precision = 10, scale = 4)
     private BigDecimal quantity;
+
+    @Column(nullable = false, precision = 10, scale = 4)
+    private BigDecimal qty;
 
     @Column(nullable = false, length = 20)
     private String unit;

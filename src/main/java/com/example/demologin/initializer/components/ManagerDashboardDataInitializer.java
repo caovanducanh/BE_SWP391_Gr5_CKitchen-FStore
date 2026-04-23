@@ -15,22 +15,7 @@ import com.example.demologin.entity.Store;
 import com.example.demologin.entity.StoreInventory;
 import com.example.demologin.entity.User;
 import com.example.demologin.enums.OrderStatus;
-import com.example.demologin.repository.BatchRepository;
-import com.example.demologin.repository.DeliveryRepository;
-import com.example.demologin.repository.IngredientRepository;
-import com.example.demologin.repository.InventoryDisposalRepository;
-import com.example.demologin.repository.IngredientBatchRepository;
-import com.example.demologin.repository.KitchenInventoryRepository;
-import com.example.demologin.repository.KitchenRepository;
-import com.example.demologin.repository.OrderItemRepository;
-import com.example.demologin.repository.OrderPriorityConfigRepository;
-import com.example.demologin.repository.OrderRepository;
-import com.example.demologin.repository.ProductRepository;
-import com.example.demologin.repository.ProductionPlanRepository;
-import com.example.demologin.repository.RecipeRepository;
-import com.example.demologin.repository.StoreInventoryRepository;
-import com.example.demologin.repository.StoreRepository;
-import com.example.demologin.repository.UserRepository;
+import com.example.demologin.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -70,10 +55,30 @@ public class ManagerDashboardDataInitializer {
     private final IngredientBatchRepository ingredientBatchRepository;
     private final RecipeRepository recipeRepository;
     private final UserRepository userRepository;
+    private final PlanIngredientRepository planIngredientRepository;
+    private final PlanIngredientBatchUsageRepository planIngredientBatchUsageRepository;
+    
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
 
     @Transactional
     public void initializeManagerDashboardData() {
         log.info("Creating manager dashboard seed data...");
+
+        // === Specific Cleanup for Legacy Init Plans ===
+        log.info("🧹 Removing legacy init plans (PLAN001-004)...");
+        try {
+            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 0").executeUpdate();
+            // Delete plans and batches that were part of the initial seed
+            entityManager.createNativeQuery("DELETE FROM production_plans WHERE id LIKE 'PLAN%'").executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM batches WHERE id LIKE 'BATCH%'").executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM orders WHERE id LIKE 'ORD%'").executeUpdate();
+            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
+            log.info("✅ Legacy init plans removed successfully.");
+        } catch (Exception e) {
+            log.warn("⚠️ Legacy cleanup failed: {}", e.getMessage());
+            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
+        }
 
         // Revised General Cleanup: Remove ANYTHING that is not bakery-focused (ID doesn't start with BAKE)
         List<Ingredient> nonBakeryIngredients = ingredientRepository.findAll().stream()
@@ -105,123 +110,10 @@ public class ManagerDashboardDataInitializer {
                 .orElseThrow(() -> new IllegalStateException("Product PROD001 not found"));
         Product product2 = productRepository.findById("PROD002")
                 .orElseThrow(() -> new IllegalStateException("Product PROD002 not found"));
-
-        log.info("📅 Ensuring Production Plans...");
-        ProductionPlan plan1 = ensureProductionPlan(
-                "PLAN001", product1, 120, "cai", "PLANNED",
-                LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(1),
-                "kitchen", "Morning production wave"
-        );
-        ensureProductionPlan(
-                "PLAN002", product2, 180, "o", "IN_PROGRESS",
-                LocalDateTime.now().minusHours(6), LocalDateTime.now().plusDays(1),
-                "kitchen", "Afternoon production wave"
-        );
-
-        if (seedOrdersEnabled) {
-            // ===== ORDERS =====
-            Order order1 = ensureOrder(
-                    "ORD001", store, kitchen, OrderStatus.PENDING, "HIGH",
-                    LocalDateTime.now().minusHours(4), LocalDate.now().plusDays(1),
-                    "Cần bổ sung gấp ngượi liệu", "storestaff", new BigDecimal("650000")
-            );
-            Order order2 = ensureOrder(
-                    "ORD002", store, kitchen, OrderStatus.IN_PROGRESS, "NORMAL",
-                    LocalDateTime.now().minusHours(8), LocalDate.now().plusDays(2),
-                    "Nhập hàng tuần", "storestaff", new BigDecimal("430000")
-            );
-            Order order3 = ensureOrder(
-                    "ORD003", store, kitchen, OrderStatus.ASSIGNED, "NORMAL",
-                    LocalDateTime.now().minusDays(1), LocalDate.now().plusDays(3),
-                    "Sự kiện cuối tuần", "storestaff", new BigDecimal("520000")
-            );
-            Order order4 = ensureOrder(
-                    "ORD004", store, kitchen, OrderStatus.SHIPPING, "HIGH",
-                    LocalDateTime.now().minusDays(2), LocalDate.now(),
-                    "Giao hôm nay", "storestaff", new BigDecimal("310000")
-            );
-            Order order5 = ensureOrder(
-                    "ORD005", store, kitchen, OrderStatus.DELIVERED, "NORMAL",
-                    LocalDateTime.now().minusDays(3), LocalDate.now().minusDays(1),
-                    "Đã nhận 28/03", "storestaff", new BigDecimal("290000")
-            );
-            Order order6 = ensureOrder(
-                    "ORD006", store, kitchen, OrderStatus.CANCELLED, "LOW",
-                    LocalDateTime.now().minusDays(4), LocalDate.now().minusDays(2),
-                    "Hủy do hết sản phẩm", "storestaff", new BigDecimal("0")
-            );
-            Order order7 = ensureOrder(
-                    "ORD007", store2, null, OrderStatus.PENDING, "HIGH",
-                    LocalDateTime.now().minusHours(6), LocalDate.now(),
-                    "Đơn mới cần điều phối bếp", "storestaff", new BigDecimal("780000")
-            );
-            Order order8 = ensureOrder(
-                    "ORD008", store2, kitchen2, OrderStatus.ASSIGNED, "NORMAL",
-                    LocalDateTime.now().minusHours(10), LocalDate.now().plusDays(1),
-                    "Đã phân bếp chi nhánh 2", "storestaff", new BigDecimal("460000")
-            );
-            Order order9 = ensureOrder(
-                    "ORD009", store2, kitchen2, OrderStatus.SHIPPING, "HIGH",
-                    LocalDateTime.now().minusDays(1), LocalDate.now(),
-                    "Đang giao tuyến Q7", "storestaff", new BigDecimal("510000")
-            );
-            Order order10 = ensureOrder(
-                    "ORD010", store2, kitchen2, OrderStatus.CANCELLED, "NORMAL",
-                    LocalDateTime.now().minusDays(2), LocalDate.now().minusDays(1),
-                    "Hủy do khách đổi kế hoạch", "storestaff", new BigDecimal("0")
-            );
-            Order order11 = ensureOrder(
-                    "ORD011", store, kitchen, OrderStatus.IN_PROGRESS, "HIGH",
-                    LocalDateTime.now().minusDays(2), LocalDate.now().minusDays(1),
-                    "Đơn quá hạn cần theo dõi", "storestaff", new BigDecimal("670000")
-            );
-            Order order12 = ensureOrder(
-                    "ORD012", store2, kitchen2, OrderStatus.DELIVERED, "LOW",
-                    LocalDateTime.now().minusDays(5), LocalDate.now().minusDays(3),
-                    "Đã hoàn tất giao nhận", "storestaff", new BigDecimal("250000")
-            );
-
-            // ===== ORDER ITEMS =====
-            ensureOrderItem(order1, product1, 50, "piece");
-            ensureOrderItem(order1, product2, 30, "piece");
-            ensureOrderItem(order2, product1, 40, "piece");
-            ensureOrderItem(order2, product2, 20, "piece");
-            ensureOrderItem(order3, product1, 60, "piece");
-            ensureOrderItem(order3, product2, 25, "piece");
-            ensureOrderItem(order4, product2, 35, "piece");
-            ensureOrderItem(order5, product1, 30, "piece");
-            ensureOrderItem(order5, product2, 15, "piece");
-            ensureOrderItem(order6, product1, 10, "piece");
-            ensureOrderItem(order7, product1, 45, "piece");
-            ensureOrderItem(order7, product2, 18, "piece");
-            ensureOrderItem(order8, product1, 28, "piece");
-            ensureOrderItem(order8, product2, 22, "piece");
-            ensureOrderItem(order9, product1, 35, "piece");
-            ensureOrderItem(order10, product2, 16, "piece");
-            ensureOrderItem(order11, product1, 42, "piece");
-            ensureOrderItem(order11, product2, 27, "piece");
-            ensureOrderItem(order12, product2, 14, "piece");
-
-            // ===== DELIVERIES =====
-            User coordinator = userRepository.findByUsername("supply")
-                    .orElseThrow(() -> new IllegalStateException("Supply coordinator user not found"));
-
-            ensureDelivery("DEL001", order3, coordinator, "ASSIGNED", LocalDateTime.now().minusHours(2));
-            ensureDelivery("DEL002", order4, coordinator, "SHIPPING", LocalDateTime.now().minusDays(1));
-            ensureDelivery("DEL003", order5, coordinator, "DELIVERED", LocalDateTime.now().minusDays(2));
-            ensureDelivery("DEL004", order8, coordinator, "ASSIGNED", LocalDateTime.now().minusHours(5));
-            ensureDelivery("DEL005", order9, coordinator, "DELAYED", LocalDateTime.now().minusHours(20));
-            ensureDelivery("DEL006", order10, coordinator, "CANCELLED", LocalDateTime.now().minusHours(30));
-            ensureDelivery("DEL007", order12, coordinator, "DELIVERED", LocalDateTime.now().minusDays(4));
-
-            ensureBatch(
-                    "BATCH001", plan1, product1, kitchen,
-                    80, 80, "cai", "AVAILABLE", LocalDate.now().plusDays(5),
-                    "kitchen"
-            );
-        } else {
-            log.info("Skipping order/delivery seed data (app.seed.orders.enabled=false)");
-        }
+        Product product3 = productRepository.findById("PROD003")
+                .orElseThrow(() -> new IllegalStateException("Product PROD003 not found"));
+        Product product4 = productRepository.findById("PROD004")
+                .orElseThrow(() -> new IllegalStateException("Product PROD004 not found"));
 
         ensureKitchenInventories(kitchen, kitchen2);
         
@@ -314,149 +206,6 @@ public class ManagerDashboardDataInitializer {
                 }
         }
 
-    private ProductionPlan ensureProductionPlan(String id,
-                                                Product product,
-                                                Integer quantity,
-                                                String unit,
-                                                String status,
-                                                LocalDateTime startDate,
-                                                LocalDateTime endDate,
-                                                String staff,
-                                                String notes) {
-        return productionPlanRepository.findById(id).orElseGet(() -> productionPlanRepository.save(ProductionPlan.builder()
-                .id(id)
-                .product(product)
-                .quantity(quantity)
-                .unit(unit)
-                .status(status)
-                .startDate(startDate)
-                .endDate(endDate)
-                .staff(staff)
-                .notes(notes)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build()));
-    }
-
-    private Order ensureOrder(String id,
-                              Store store,
-                              Kitchen kitchen,
-                              OrderStatus status,
-                              String priority,
-                              LocalDateTime createdAt,
-                              LocalDate requestedDate,
-                              String notes,
-                              String createdBy,
-                              BigDecimal total) {
-        return orderRepository.findById(id)
-                .map(existing -> {
-                    existing.setStore(store);
-                    existing.setKitchen(kitchen);
-                    existing.setStatus(status);
-                    existing.setPriority(priority);
-                    existing.setCreatedAt(createdAt);
-                    existing.setRequestedDate(requestedDate);
-                    existing.setNotes(notes);
-                    existing.setCreatedBy(createdBy);
-                    existing.setTotal(total);
-                    existing.setUpdatedAt(LocalDateTime.now());
-                    return orderRepository.save(existing);
-                })
-                .orElseGet(() -> orderRepository.save(Order.builder()
-                        .id(id)
-                        .store(store)
-                        .kitchen(kitchen)
-                        .status(status)
-                        .priority(priority)
-                        .createdAt(createdAt)
-                        .requestedDate(requestedDate)
-                        .notes(notes)
-                        .createdBy(createdBy)
-                        .total(total)
-                        .updatedAt(LocalDateTime.now())
-                        .build()));
-    }
-
-    private void ensureDelivery(String id, Order order, User coordinator, String status, LocalDateTime assignedAt) {
-        deliveryRepository.findById(id)
-                .map(existing -> {
-                    existing.setOrder(order);
-                    existing.setCoordinator(coordinator);
-                    existing.setStatus(status);
-                    existing.setAssignedAt(assignedAt);
-                    existing.setDeliveredAt("DELIVERED".equalsIgnoreCase(status) ? assignedAt.plusHours(4) : null);
-                    existing.setNotes(buildDeliveryNote(status));
-                    existing.setReceiverName("DELIVERED".equalsIgnoreCase(status) ? "Store Receiver" : null);
-                    existing.setTemperatureOk("DELIVERED".equalsIgnoreCase(status) ? Boolean.TRUE : null);
-                    existing.setUpdatedAt(LocalDateTime.now());
-                    return deliveryRepository.save(existing);
-                })
-                .orElseGet(() -> deliveryRepository.save(Delivery.builder()
-                        .id(id)
-                        .order(order)
-                        .coordinator(coordinator)
-                        .status(status)
-                        .assignedAt(assignedAt)
-                        .deliveredAt("DELIVERED".equalsIgnoreCase(status) ? assignedAt.plusHours(4) : null)
-                        .notes(buildDeliveryNote(status))
-                        .receiverName("DELIVERED".equalsIgnoreCase(status) ? "Store Receiver" : null)
-                        .temperatureOk("DELIVERED".equalsIgnoreCase(status) ? Boolean.TRUE : null)
-                        .createdAt(assignedAt.minusMinutes(30))
-                        .updatedAt(LocalDateTime.now())
-                        .build()));
-    }
-
-        private String buildDeliveryNote(String status) {
-                if ("DELAYED".equalsIgnoreCase(status)) {
-                        return "Trễ chuyến do kẹt xe giờ cao điểm";
-                }
-                if ("CANCELLED".equalsIgnoreCase(status)) {
-                        return "Hủy chuyến do cửa hàng thay đổi nhu cầu";
-                }
-                return "";
-        }
-
-    private void ensureBatch(String id,
-                             ProductionPlan plan,
-                             Product product,
-                             Kitchen kitchen,
-                             Integer quantity,
-                             Integer remainingQuantity,
-                             String unit,
-                             String status,
-                             LocalDate expiryDate,
-                             String staff) {
-        batchRepository.findById(id).orElseGet(() -> batchRepository.save(Batch.builder()
-                .id(id)
-                .plan(plan)
-                .product(product)
-                .kitchen(kitchen)
-                .quantity(quantity)
-                .remainingQuantity(remainingQuantity)
-                .unit(unit)
-                .status(status)
-                .expiryDate(expiryDate)
-                .staff(staff)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build()));
-    }
-
-    private void ensureOrderItem(Order order, Product product, int quantity, String unit) {
-        boolean exists = orderItemRepository.findByOrder_Id(order.getId())
-                .stream().anyMatch(i -> i.getProduct().getId().equals(product.getId()));
-        if (exists) return;
-        orderItemRepository.save(
-                com.example.demologin.entity.OrderItem.builder()
-                        .order(order)
-                        .product(product)
-                        .quantity(quantity)
-                        .unit(unit)
-                        .createdAt(LocalDateTime.now())
-                        .build()
-        );
-    }
-
     private void ensureKitchenInventories(Kitchen kitchen, Kitchen kitchen2) {
         List<Ingredient> allIngredients = ingredientRepository.findAll();
         log.info("Ensuring warehouse inventories for {} ingredients cross kitchens...", allIngredients.size());
@@ -473,6 +222,16 @@ public class ManagerDashboardDataInitializer {
         Random random = new Random();
         // Check if we already have a decent amount (at least 1000 units)
         Optional<KitchenInventory> existing = kitchenInventoryRepository.findByKitchen_IdAndIngredient_Id(kitchen.getId(), ingredient.getId());
+
+        // Force update expiry date for existing boost batches to end of year
+        List<IngredientBatch> existingBatches = ingredientBatchRepository.findByKitchen_IdAndIngredient_IdAndStatus(kitchen.getId(), ingredient.getId(), "ACTIVE");
+        for (IngredientBatch b : existingBatches) {
+            if ("SYSTEM_BOOST".equals(b.getSupplier()) || b.getBatchNo().startsWith("BOOST-")) {
+                b.setExpiryDate(LocalDate.of(LocalDate.now().getYear(), 12, 31));
+                b.setUpdatedAt(LocalDateTime.now());
+                ingredientBatchRepository.save(b);
+            }
+        }
 
         if (existing.isPresent() && existing.get().getTotalQuantity().compareTo(new BigDecimal("1000")) > 0) {
             return; // Already has plenty
@@ -491,7 +250,7 @@ public class ManagerDashboardDataInitializer {
                 .initialQuantity(qty)
                 .remainingQuantity(qty)
                 .unit(ingredient.getUnit())
-                .expiryDate(LocalDate.now().plusYears(1))
+                .expiryDate(LocalDate.of(LocalDate.now().getYear(), 12, 31))
                 .status("ACTIVE")
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())

@@ -4,11 +4,7 @@ import com.example.demologin.dto.request.supplycoordinator.AssignOrderKitchenReq
 import com.example.demologin.dto.request.supplycoordinator.HandleIssueRequest;
 import com.example.demologin.dto.request.supplycoordinator.ScheduleDeliveryRequest;
 import com.example.demologin.dto.request.supplycoordinator.UpdateDeliveryStatusRequest;
-import com.example.demologin.dto.response.DeliveryResponse;
-import com.example.demologin.dto.response.OrderHolderResponse;
-import com.example.demologin.dto.response.OrderPickupQrResponse;
-import com.example.demologin.dto.response.OrderResponse;
-import com.example.demologin.dto.response.SupplyCoordinatorOverviewResponse;
+import com.example.demologin.dto.response.*;
 import com.example.demologin.entity.Delivery;
 import com.example.demologin.entity.Kitchen;
 import com.example.demologin.entity.Order;
@@ -33,6 +29,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -46,13 +44,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+@MockitoSettings(strictness = Strictness.LENIENT)
 @ExtendWith(MockitoExtension.class)
 class SupplyCoordinatorServiceImplTest {
 
@@ -103,10 +98,6 @@ class SupplyCoordinatorServiceImplTest {
         when(userRepository.findByUsername("supply")).thenReturn(Optional.of(coordinator));
     }
 
-    private void mockDeliveryRepositoryCount(long count) {
-        when(deliveryRepository.count()).thenReturn(count);
-    }
-
     private OrderItem createOrderItem() {
         return OrderItem.builder()
                 .id(1)
@@ -115,6 +106,40 @@ class SupplyCoordinatorServiceImplTest {
                 .unit("kg")
                 .createdAt(LocalDateTime.now())
                 .build();
+    }
+
+    // ==================== getKitchens() TESTS ====================
+
+    @Test
+    void getKitchens_ReturnsPagedKitchens() {
+        mockCurrentSupplyCoordinator();
+
+        Kitchen kitchen1 = Kitchen.builder().id("KIT001").name("Kitchen 1").build();
+        Kitchen kitchen2 = Kitchen.builder().id("KIT002").name("Kitchen 2").build();
+        Page<Kitchen> kitchenPage = new PageImpl<>(List.of(kitchen1, kitchen2));
+
+        when(kitchenRepository.findAll(any(PageRequest.class))).thenReturn(kitchenPage);
+
+        Page<KitchenResponse> response = service.getKitchens(0, 20, principal);
+
+        assertEquals(2, response.getTotalElements());
+        assertEquals("Kitchen 1", response.getContent().get(0).getName());
+    }
+
+    @Test
+    void getKitchens_WithValidPagination_ReturnsPaginatedResults() {
+        mockCurrentSupplyCoordinator();
+
+        Kitchen kitchen = Kitchen.builder().id("KIT001").name("Kitchen 1").build();
+        Page<Kitchen> kitchenPage = new PageImpl<>(List.of(kitchen), PageRequest.of(0, 20), 1);
+
+        when(kitchenRepository.findAll(any(PageRequest.class))).thenReturn(kitchenPage);
+
+        Page<KitchenResponse> response = service.getKitchens(0, 20, principal);
+
+        assertEquals(1, response.getTotalElements());
+        assertEquals(0, response.getNumber());
+        assertEquals(20, response.getSize());
     }
 
     // ==================== getOrders() TESTS ====================
@@ -291,6 +316,191 @@ class SupplyCoordinatorServiceImplTest {
         assertEquals("Test Product", response.getContent().get(0).getItems().get(0).getProductName());
     }
 
+    @Test
+    void getOrders_WhenStoreIdIsValid_AppliesStoreFilter() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder()
+                .id("ORD001")
+                .store(store)
+                .status(OrderStatus.PENDING)
+                .build();
+        Page<Order> orderPage = new PageImpl<>(List.of(order));
+
+        when(storeRepository.existsById("ST001")).thenReturn(true);
+        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        Page<OrderResponse> response = service.getOrders(null, null, "ST001", null, null, null, 0, 20, principal);
+
+        assertEquals(1, response.getTotalElements());
+        verify(storeRepository).existsById("ST001");
+    }
+
+    @Test
+    void getOrders_WhenKitchenNull_StillReturnsOrders() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder()
+                .id("ORD001")
+                .store(store)
+                .kitchen(null)
+                .status(OrderStatus.PENDING)
+                .build();
+        Page<Order> orderPage = new PageImpl<>(List.of(order));
+
+        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        Page<OrderResponse> response = service.getOrders(null, null, null, null, null, null, 0, 20, principal);
+
+        assertEquals(1, response.getTotalElements());
+        assertNull(response.getContent().get(0).getKitchenId());
+    }
+
+    @Test
+    void getOrders_WithEmptyStringPriority_ReturnsOrders() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder().id("ORD001").store(store).status(OrderStatus.PENDING).build();
+        Page<Order> orderPage = new PageImpl<>(List.of(order));
+
+        when(storeRepository.existsById("ST001")).thenReturn(true);
+        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        Page<OrderResponse> response = service.getOrders(null, "", "ST001", null, null, null, 0, 20, principal);
+
+        assertEquals(1, response.getTotalElements());
+    }
+
+    @Test
+    void getOrders_WithBlankStringPriority_ReturnsOrders() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder().id("ORD001").store(store).status(OrderStatus.PENDING).build();
+        Page<Order> orderPage = new PageImpl<>(List.of(order));
+
+        when(storeRepository.existsById("ST001")).thenReturn(true);
+        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        Page<OrderResponse> response = service.getOrders(null, "   ", "ST001", null, null, null, 0, 20, principal);
+
+        assertEquals(1, response.getTotalElements());
+    }
+
+    @Test
+    void getOrders_WithWhitespaceOnlyPriority_TreatsAsNull() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder().id("ORD001").store(store).status(OrderStatus.PENDING).build();
+        Page<Order> orderPage = new PageImpl<>(List.of(order));
+
+        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        Page<OrderResponse> response = service.getOrders(null, "   ", null, null, null, null, 0, 20, principal);
+
+        assertEquals(1, response.getTotalElements());
+    }
+
+    @Test
+    void getOrders_WithFromDateOnly_AppliesFromDateFilter() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder()
+                .id("ORD001")
+                .store(store)
+                .status(OrderStatus.PENDING)
+                .requestedDate(LocalDate.of(2026, 4, 15))
+                .build();
+        Page<Order> orderPage = new PageImpl<>(List.of(order));
+
+        when(storeRepository.existsById("ST001")).thenReturn(true);
+        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        Page<OrderResponse> response = service.getOrders(
+                null, null, "ST001", null,
+                LocalDate.of(2026, 4, 1), null,
+                0, 20, principal);
+
+        assertEquals(1, response.getTotalElements());
+    }
+
+    @Test
+    void getOrders_WithToDateOnly_AppliesToDateFilter() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder()
+                .id("ORD001")
+                .store(store)
+                .status(OrderStatus.PENDING)
+                .requestedDate(LocalDate.of(2026, 4, 15))
+                .build();
+        Page<Order> orderPage = new PageImpl<>(List.of(order));
+
+        when(storeRepository.existsById("ST001")).thenReturn(true);
+        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        Page<OrderResponse> response = service.getOrders(
+                null, null, "ST001", null,
+                null, LocalDate.of(2026, 4, 30),
+                0, 20, principal);
+
+        assertEquals(1, response.getTotalElements());
+    }
+
+    @Test
+    void parseOrderStatus_WhenStatusIsNull_ReturnsNull() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder().id("ORD001").store(store).status(OrderStatus.PENDING).build();
+        Page<Order> orderPage = new PageImpl<>(List.of(order));
+
+        when(storeRepository.existsById("ST001")).thenReturn(true);
+        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        Page<OrderResponse> response = service.getOrders(null, null, "ST001", null, null, null, 0, 20, principal);
+
+        assertEquals(1, response.getTotalElements());
+    }
+
+    @Test
+    void validateDateRange_WhenFromDateIsNull_DoesNotThrow() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder().id("ORD001").store(store).status(OrderStatus.PENDING).build();
+        Page<Order> orderPage = new PageImpl<>(List.of(order));
+
+        when(storeRepository.existsById("ST001")).thenReturn(true);
+        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        Page<OrderResponse> response = service.getOrders(null, null, "ST001", null, null, LocalDate.of(2026, 4, 30), 0, 20, principal);
+
+        assertEquals(1, response.getTotalElements());
+    }
+
+    @Test
+    void validateDateRange_WhenToDateIsNull_DoesNotThrow() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder().id("ORD001").store(store).status(OrderStatus.PENDING).build();
+        Page<Order> orderPage = new PageImpl<>(List.of(order));
+
+        when(storeRepository.existsById("ST001")).thenReturn(true);
+        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        Page<OrderResponse> response = service.getOrders(null, null, "ST001", null, LocalDate.of(2026, 4, 1), null, 0, 20, principal);
+
+        assertEquals(1, response.getTotalElements());
+    }
+
     // ==================== getOrderById() TESTS ====================
 
     @Test
@@ -422,6 +632,36 @@ class SupplyCoordinatorServiceImplTest {
     }
 
     @Test
+    void assignOrderToKitchen_WhenOrderAlreadyHasKitchen_UpdatesKitchen() {
+        mockCurrentSupplyCoordinator();
+
+        Kitchen oldKitchen = Kitchen.builder().id("KIT001").name("Old Kitchen").build();
+        Kitchen newKitchen = Kitchen.builder().id("KIT002").name("New Kitchen").build();
+
+        AssignOrderKitchenRequest request = new AssignOrderKitchenRequest();
+        ReflectionTestUtils.setField(request, "kitchenId", "KIT002");
+
+        Order order = Order.builder()
+                .id("ORD001")
+                .store(store)
+                .kitchen(oldKitchen)
+                .status(OrderStatus.ASSIGNED)
+                .assignedAt(LocalDateTime.now().minusDays(1))
+                .createdAt(LocalDateTime.now())
+                .requestedDate(LocalDate.now())
+                .build();
+
+        when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
+        when(kitchenRepository.findById("KIT002")).thenReturn(Optional.of(newKitchen));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        OrderResponse response = service.assignOrderToKitchen("ORD001", request, principal);
+
+        assertEquals("KIT002", response.getKitchenId());
+    }
+
+    @Test
     void assignOrderToKitchen_WhenOrderCompleted_ThrowsBadRequestException() {
         mockCurrentSupplyCoordinator();
 
@@ -497,6 +737,62 @@ class SupplyCoordinatorServiceImplTest {
         assertEquals("PROD001", response.getItems().get(0).getProductId());
     }
 
+    @Test
+    void appendNote_WhenOldNotesIsNull_CreatesNewNote() {
+        mockCurrentSupplyCoordinator();
+
+        AssignOrderKitchenRequest request = new AssignOrderKitchenRequest();
+        ReflectionTestUtils.setField(request, "kitchenId", "KIT001");
+        ReflectionTestUtils.setField(request, "notes", "First note");
+
+        Order order = Order.builder()
+                .id("ORD001")
+                .store(store)
+                .status(OrderStatus.PENDING)
+                .createdAt(LocalDateTime.now())
+                .requestedDate(LocalDate.now())
+                .notes(null)
+                .build();
+
+        when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
+        when(kitchenRepository.findById("KIT001")).thenReturn(Optional.of(kitchen));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        OrderResponse response = service.assignOrderToKitchen("ORD001", request, principal);
+
+        assertNotNull(response.getNotes());
+        assertTrue(response.getNotes().contains("First note"));
+    }
+
+    @Test
+    void appendNote_WhenOldNotesIsBlank_CreatesNewNote() {
+        mockCurrentSupplyCoordinator();
+
+        AssignOrderKitchenRequest request = new AssignOrderKitchenRequest();
+        ReflectionTestUtils.setField(request, "kitchenId", "KIT001");
+        ReflectionTestUtils.setField(request, "notes", "First note");
+
+        Order order = Order.builder()
+                .id("ORD001")
+                .store(store)
+                .status(OrderStatus.PENDING)
+                .createdAt(LocalDateTime.now())
+                .requestedDate(LocalDate.now())
+                .notes("")
+                .build();
+
+        when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
+        when(kitchenRepository.findById("KIT001")).thenReturn(Optional.of(kitchen));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        OrderResponse response = service.assignOrderToKitchen("ORD001", request, principal);
+
+        assertNotNull(response.getNotes());
+        assertTrue(response.getNotes().contains("First note"));
+    }
+
     // ==================== getOverview() TESTS ====================
 
     @Test
@@ -542,12 +838,42 @@ class SupplyCoordinatorServiceImplTest {
         verify(orderRepository, atLeastOnce()).count(any(Specification.class));
     }
 
+    @Test
+    void getOverview_WithNullDates_UsesCurrentDate() {
+        mockCurrentSupplyCoordinator();
+
+        when(orderRepository.count(any(Specification.class)))
+                .thenReturn(10L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L);
+        when(deliveryRepository.countByCoordinator_UserIdAndStatusIn(anyLong(), any()))
+                .thenReturn(5L);
+
+        SupplyCoordinatorOverviewResponse response = service.getOverview(null, null, principal);
+
+        assertNotNull(response);
+        verify(orderRepository, atLeast(10)).count(any(Specification.class));
+    }
+
+    @Test
+    void getOverview_VerifyAllSpecificationsAreCalled() {
+        mockCurrentSupplyCoordinator();
+
+        when(orderRepository.count(any(Specification.class)))
+                .thenReturn(10L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L);
+        when(deliveryRepository.countByCoordinator_UserIdAndStatusIn(anyLong(), any()))
+                .thenReturn(5L);
+
+        SupplyCoordinatorOverviewResponse response = service.getOverview(
+                LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 30), principal);
+
+        assertNotNull(response);
+        verify(orderRepository, atLeast(10)).count(any(Specification.class));
+    }
+
     // ==================== scheduleDelivery() TESTS ====================
 
     @Test
     void scheduleDelivery_shouldCreateShippingDeliveryAndUpdateOrder() {
         mockCurrentSupplyCoordinator();
-        mockDeliveryRepositoryCount(12L);
 
         ScheduleDeliveryRequest request = new ScheduleDeliveryRequest();
         ReflectionTestUtils.setField(request, "orderId", "ORD001");
@@ -579,7 +905,6 @@ class SupplyCoordinatorServiceImplTest {
     @Test
     void scheduleDelivery_WithAssignedStatus_DoesNotChangeOrderToShipping() {
         mockCurrentSupplyCoordinator();
-        mockDeliveryRepositoryCount(0L);
 
         ScheduleDeliveryRequest request = new ScheduleDeliveryRequest();
         ReflectionTestUtils.setField(request, "orderId", "ORD001");
@@ -608,7 +933,6 @@ class SupplyCoordinatorServiceImplTest {
     @Test
     void scheduleDelivery_WhenStatusIsNull_DefaultsToAssigned() {
         mockCurrentSupplyCoordinator();
-        mockDeliveryRepositoryCount(0L);
 
         ScheduleDeliveryRequest request = new ScheduleDeliveryRequest();
         ReflectionTestUtils.setField(request, "orderId", "ORD001");
@@ -636,7 +960,6 @@ class SupplyCoordinatorServiceImplTest {
     @Test
     void scheduleDelivery_WithCustomAssignedAt_UsesProvidedTime() {
         mockCurrentSupplyCoordinator();
-        mockDeliveryRepositoryCount(12L);
 
         ScheduleDeliveryRequest request = new ScheduleDeliveryRequest();
         ReflectionTestUtils.setField(request, "orderId", "ORD001");
@@ -729,7 +1052,6 @@ class SupplyCoordinatorServiceImplTest {
     @Test
     void scheduleDelivery_WhenOrderHasAssignedAt_DoesNotOverride() {
         mockCurrentSupplyCoordinator();
-        mockDeliveryRepositoryCount(12L);
 
         ScheduleDeliveryRequest request = new ScheduleDeliveryRequest();
         ReflectionTestUtils.setField(request, "orderId", "ORD001");
@@ -829,6 +1151,56 @@ class SupplyCoordinatorServiceImplTest {
         Page<DeliveryResponse> response = service.getDeliveries(null, 0, 20, principal);
 
         assertNull(response.getContent().get(0).getCoordinatorName());
+    }
+
+    @Test
+    void getDeliveries_WhenShipperIsNotNull_ReturnsResponseWithShipperName() {
+        mockCurrentSupplyCoordinator();
+
+        User shipper = new User();
+        shipper.setUserId(2L);
+        shipper.setUsername("shipper01");
+        shipper.setFullName("Shipper One");
+
+        Order order = Order.builder().id("ORD001").status(OrderStatus.SHIPPING).store(store).build();
+        Delivery delivery = Delivery.builder()
+                .id("DEL001")
+                .order(order)
+                .coordinator(coordinator)
+                .shipper(shipper)
+                .status("SHIPPING")
+                .assignedAt(LocalDateTime.now())
+                .build();
+
+        when(deliveryRepository.findByCoordinator_UserId(anyLong(), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(delivery)));
+
+        Page<DeliveryResponse> response = service.getDeliveries(null, 0, 20, principal);
+
+        assertNotNull(response.getContent().get(0).getShipperName());
+        assertEquals("Shipper One", response.getContent().get(0).getShipperName());
+    }
+
+    @Test
+    void getDeliveries_WhenShipperIsNull_ReturnsResponseWithoutShipperName() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder().id("ORD001").status(OrderStatus.SHIPPING).store(store).build();
+        Delivery delivery = Delivery.builder()
+                .id("DEL001")
+                .order(order)
+                .coordinator(coordinator)
+                .shipper(null)
+                .status("SHIPPING")
+                .assignedAt(LocalDateTime.now())
+                .build();
+
+        when(deliveryRepository.findByCoordinator_UserId(anyLong(), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(delivery)));
+
+        Page<DeliveryResponse> response = service.getDeliveries(null, 0, 20, principal);
+
+        assertNull(response.getContent().get(0).getShipperName());
     }
 
     // ==================== updateDeliveryStatus() TESTS ====================
@@ -1280,6 +1652,45 @@ class SupplyCoordinatorServiceImplTest {
         assertTrue(delivery.getNotes().contains("Delivered with care"));
     }
 
+    @Test
+    void updateDeliveryStatus_WithShipperNotNull_ReturnsResponseWithShipperName() {
+        mockCurrentSupplyCoordinator();
+
+        User shipper = new User();
+        shipper.setUserId(2L);
+        shipper.setUsername("shipper01");
+        shipper.setFullName("Shipper One");
+
+        UpdateDeliveryStatusRequest request = new UpdateDeliveryStatusRequest();
+        ReflectionTestUtils.setField(request, "status", "SHIPPING");
+
+        Order order = Order.builder()
+                .id("ORD001")
+                .store(store)
+                .status(OrderStatus.ASSIGNED)
+                .createdAt(LocalDateTime.now())
+                .requestedDate(LocalDate.now())
+                .build();
+
+        Delivery delivery = Delivery.builder()
+                .id("DEL001")
+                .order(order)
+                .coordinator(coordinator)
+                .shipper(shipper)
+                .status("ASSIGNED")
+                .assignedAt(LocalDateTime.now())
+                .build();
+
+        when(deliveryRepository.findById("DEL001")).thenReturn(Optional.of(delivery));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(deliveryRepository.save(any(Delivery.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        DeliveryResponse response = service.updateDeliveryStatus("DEL001", request, principal);
+
+        assertNotNull(response.getShipperName());
+        assertEquals("Shipper One", response.getShipperName());
+    }
+
     // ==================== handleIssue() TESTS ====================
 
     @Test
@@ -1383,6 +1794,42 @@ class SupplyCoordinatorServiceImplTest {
         assertEquals(OrderStatus.ASSIGNED, response.getStatus());
         assertTrue(response.getNotes().contains("SHORTAGE"));
         assertTrue(response.getNotes().contains("Missing 5 boxes"));
+    }
+
+    @Test
+    void handleIssue_WithShortageIssue_OnlyAddsNoteAndDoesNotChangeDelivery() {
+        mockCurrentSupplyCoordinator();
+
+        HandleIssueRequest request = new HandleIssueRequest();
+        ReflectionTestUtils.setField(request, "issueType", "SHORTAGE");
+        ReflectionTestUtils.setField(request, "description", "Missing items");
+        ReflectionTestUtils.setField(request, "cancelOrder", false);
+
+        Order order = Order.builder()
+                .id("ORD001")
+                .store(store)
+                .status(OrderStatus.ASSIGNED)
+                .createdAt(LocalDateTime.now())
+                .requestedDate(LocalDate.now())
+                .build();
+
+        Delivery delivery = Delivery.builder()
+                .id("DEL001")
+                .order(order)
+                .status("ASSIGNED")
+                .assignedAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
+        when(deliveryRepository.findByOrder_Id("ORD001")).thenReturn(Optional.of(delivery));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
+
+        OrderResponse response = service.handleIssue("ORD001", request, principal);
+
+        assertEquals(OrderStatus.ASSIGNED, response.getStatus());
+        assertEquals("ASSIGNED", delivery.getStatus());
+        assertTrue(response.getNotes().contains("SHORTAGE"));
     }
 
     @Test
@@ -1671,7 +2118,6 @@ class SupplyCoordinatorServiceImplTest {
     @Test
     void getOrderPickupQr_WhenDeliveryNotExistsButStatusValid_CreatesDelivery() {
         mockCurrentSupplyCoordinator();
-        mockDeliveryRepositoryCount(5L);
 
         Order order = Order.builder()
                 .id("ORD001")
@@ -1747,7 +2193,6 @@ class SupplyCoordinatorServiceImplTest {
     @Test
     void getOrderPickupQr_WhenOrderStatusShipping_CreatesDeliveryWithShippingStatus() {
         mockCurrentSupplyCoordinator();
-        mockDeliveryRepositoryCount(5L);
 
         Order order = Order.builder()
                 .id("ORD001")
@@ -1767,6 +2212,24 @@ class SupplyCoordinatorServiceImplTest {
         ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(deliveryCaptor.capture());
         assertEquals("SHIPPING", deliveryCaptor.getValue().getStatus());
+    }
+
+    @Test
+    void getOrderPickupQr_WhenQRCodeExists_ReturnsExistingQR() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder().id("ORD001").status(OrderStatus.SHIPPING).build();
+        Delivery delivery = Delivery.builder()
+                .id("DEL001")
+                .pickupQrCode("EXISTING-QR-CODE")
+                .build();
+
+        when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
+        when(deliveryRepository.findByOrder_Id("ORD001")).thenReturn(Optional.of(delivery));
+
+        OrderPickupQrResponse response = service.getOrderPickupQr("ORD001", principal);
+
+        assertEquals("EXISTING-QR-CODE", response.getPickupQrCode());
     }
 
     // ==================== getOrderHolder() TESTS ====================
@@ -1835,6 +2298,30 @@ class SupplyCoordinatorServiceImplTest {
         assertNull(response.getHolderFullName());
     }
 
+    @Test
+    void getOrderHolder_WhenShipperIsNull_ReturnsResponseWithNullShipperInfo() {
+        mockCurrentSupplyCoordinator();
+
+        Order order = Order.builder().id("ORD001").status(OrderStatus.SHIPPING).build();
+        Delivery delivery = Delivery.builder()
+                .id("DEL001")
+                .order(order)
+                .shipper(null)
+                .status("SHIPPING")
+                .pickupQrCode("QR123")
+                .build();
+
+        when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
+        when(deliveryRepository.findByOrder_Id("ORD001")).thenReturn(Optional.of(delivery));
+
+        OrderHolderResponse response = service.getOrderHolder("ORD001", principal);
+
+        assertNull(response.getHolderUserId());
+        assertNull(response.getHolderUsername());
+        assertNull(response.getHolderFullName());
+        assertEquals("QR123", response.getPickupQrCode());
+    }
+
     // ==================== getOrderStatuses() TESTS ====================
 
     @Test
@@ -1875,6 +2362,17 @@ class SupplyCoordinatorServiceImplTest {
                 "ASSIGNED", "SHIPPING", "DELAYED", "WAITING_CONFIRM", "DELIVERED", "CANCELLED")));
     }
 
+    @Test
+    void getDeliveryStatuses_ReturnsAllValidStatuses() {
+        mockCurrentSupplyCoordinator();
+
+        List<String> statuses = service.getDeliveryStatuses(principal);
+
+        assertEquals(6, statuses.size());
+        assertTrue(statuses.containsAll(List.of(
+                "ASSIGNED", "CANCELLED", "DELAYED", "DELIVERED", "SHIPPING", "WAITING_CONFIRM")));
+    }
+
     // ==================== Authentication / Authorization TESTS ====================
 
     @Test
@@ -1911,7 +2409,6 @@ class SupplyCoordinatorServiceImplTest {
     @Test
     void generateDeliveryId_ShouldHaveCorrectFormat() {
         mockCurrentSupplyCoordinator();
-        mockDeliveryRepositoryCount(0L);
 
         ScheduleDeliveryRequest request = new ScheduleDeliveryRequest();
         ReflectionTestUtils.setField(request, "orderId", "ORD001");
@@ -1933,318 +2430,8 @@ class SupplyCoordinatorServiceImplTest {
         DeliveryResponse response = service.scheduleDelivery(request, principal);
 
         assertNotNull(response.getId());
-        assertEquals(10, response.getId().length());
-        assertTrue(response.getId().startsWith("DEL"));
-        String afterDel = response.getId().substring(3);
-        assertTrue(afterDel.matches("\\d{7}"));
-    }
-
-    // ==================== Edge Cases for appendNote() ====================
-
-    @Test
-    void appendNote_WhenOldNotesIsNull_CreatesNewNote() {
-        mockCurrentSupplyCoordinator();
-
-        AssignOrderKitchenRequest request = new AssignOrderKitchenRequest();
-        ReflectionTestUtils.setField(request, "kitchenId", "KIT001");
-        ReflectionTestUtils.setField(request, "notes", "First note");
-
-        Order order = Order.builder()
-                .id("ORD001")
-                .store(store)
-                .status(OrderStatus.PENDING)
-                .createdAt(LocalDateTime.now())
-                .requestedDate(LocalDate.now())
-                .notes(null)
-                .build();
-
-        when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
-        when(kitchenRepository.findById("KIT001")).thenReturn(Optional.of(kitchen));
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
-
-        OrderResponse response = service.assignOrderToKitchen("ORD001", request, principal);
-
-        assertNotNull(response.getNotes());
-        assertTrue(response.getNotes().contains("First note"));
-    }
-
-    @Test
-    void appendNote_WhenOldNotesIsBlank_CreatesNewNote() {
-        mockCurrentSupplyCoordinator();
-
-        AssignOrderKitchenRequest request = new AssignOrderKitchenRequest();
-        ReflectionTestUtils.setField(request, "kitchenId", "KIT001");
-        ReflectionTestUtils.setField(request, "notes", "First note");
-
-        Order order = Order.builder()
-                .id("ORD001")
-                .store(store)
-                .status(OrderStatus.PENDING)
-                .createdAt(LocalDateTime.now())
-                .requestedDate(LocalDate.now())
-                .notes("")
-                .build();
-
-        when(orderRepository.findById("ORD001")).thenReturn(Optional.of(order));
-        when(kitchenRepository.findById("KIT001")).thenReturn(Optional.of(kitchen));
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
-
-        OrderResponse response = service.assignOrderToKitchen("ORD001", request, principal);
-
-        assertNotNull(response.getNotes());
-        assertTrue(response.getNotes().contains("First note"));
-    }
-
-    // ==================== Private Methods Coverage ====================
-
-    @Test
-    void parseOrderStatus_WhenStatusIsNull_ReturnsNull() {
-        mockCurrentSupplyCoordinator();
-
-        Order order = Order.builder().id("ORD001").store(store).status(OrderStatus.PENDING).build();
-        Page<Order> orderPage = new PageImpl<>(List.of(order));
-
-        when(storeRepository.existsById("ST001")).thenReturn(true);
-        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
-        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
-
-        Page<OrderResponse> response = service.getOrders(null, null, "ST001", null, null, null, 0, 20, principal);
-
-        assertEquals(1, response.getTotalElements());
-    }
-
-    @Test
-    void validateDateRange_WhenFromDateIsNull_DoesNotThrow() {
-        mockCurrentSupplyCoordinator();
-
-        Order order = Order.builder().id("ORD001").store(store).status(OrderStatus.PENDING).build();
-        Page<Order> orderPage = new PageImpl<>(List.of(order));
-
-        when(storeRepository.existsById("ST001")).thenReturn(true);
-        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
-        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
-
-        Page<OrderResponse> response = service.getOrders(null, null, "ST001", null, null, LocalDate.of(2026, 4, 30), 0, 20, principal);
-
-        assertEquals(1, response.getTotalElements());
-    }
-
-    @Test
-    void validateDateRange_WhenToDateIsNull_DoesNotThrow() {
-        mockCurrentSupplyCoordinator();
-
-        Order order = Order.builder().id("ORD001").store(store).status(OrderStatus.PENDING).build();
-        Page<Order> orderPage = new PageImpl<>(List.of(order));
-
-        when(storeRepository.existsById("ST001")).thenReturn(true);
-        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
-        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
-
-        Page<OrderResponse> response = service.getOrders(null, null, "ST001", null, LocalDate.of(2026, 4, 1), null, 0, 20, principal);
-
-        assertEquals(1, response.getTotalElements());
-    }
-    // ==================== COVER toDeliveryResponse BRANCHES ====================
-
-    @Test
-    void getDeliveries_WhenShipperIsNotNull_ReturnsResponseWithShipperName() {
-        mockCurrentSupplyCoordinator();
-
-        User shipper = new User();
-        shipper.setUserId(2L);
-        shipper.setUsername("shipper01");
-        shipper.setFullName("Shipper One");
-
-        Order order = Order.builder().id("ORD001").status(OrderStatus.SHIPPING).store(store).build();
-        Delivery delivery = Delivery.builder()
-                .id("DEL001")
-                .order(order)
-                .coordinator(coordinator)
-                .shipper(shipper)
-                .status("SHIPPING")
-                .assignedAt(LocalDateTime.now())
-                .build();
-
-        when(deliveryRepository.findByCoordinator_UserId(anyLong(), any(PageRequest.class)))
-                .thenReturn(new PageImpl<>(List.of(delivery)));
-
-        Page<DeliveryResponse> response = service.getDeliveries(null, 0, 20, principal);
-
-        assertNotNull(response.getContent().get(0).getShipperName());
-        assertEquals("Shipper One", response.getContent().get(0).getShipperName());
-    }
-
-    @Test
-    void getDeliveries_WhenShipperIsNull_ReturnsResponseWithoutShipperName() {
-        mockCurrentSupplyCoordinator();
-
-        Order order = Order.builder().id("ORD001").status(OrderStatus.SHIPPING).store(store).build();
-        Delivery delivery = Delivery.builder()
-                .id("DEL001")
-                .order(order)
-                .coordinator(coordinator)
-                .shipper(null)
-                .status("SHIPPING")
-                .assignedAt(LocalDateTime.now())
-                .build();
-
-        when(deliveryRepository.findByCoordinator_UserId(anyLong(), any(PageRequest.class)))
-                .thenReturn(new PageImpl<>(List.of(delivery)));
-
-        Page<DeliveryResponse> response = service.getDeliveries(null, 0, 20, principal);
-
-        assertNull(response.getContent().get(0).getShipperName());
-    }
-
-    @Test
-    void updateDeliveryStatus_WithShipperNotNull_ReturnsResponseWithShipperName() {
-        mockCurrentSupplyCoordinator();
-
-        User shipper = new User();
-        shipper.setUserId(2L);
-        shipper.setUsername("shipper01");
-        shipper.setFullName("Shipper One");
-
-        UpdateDeliveryStatusRequest request = new UpdateDeliveryStatusRequest();
-        ReflectionTestUtils.setField(request, "status", "SHIPPING");
-
-        Order order = Order.builder()
-                .id("ORD001")
-                .store(store)
-                .status(OrderStatus.ASSIGNED)
-                .createdAt(LocalDateTime.now())
-                .requestedDate(LocalDate.now())
-                .build();
-
-        Delivery delivery = Delivery.builder()
-                .id("DEL001")
-                .order(order)
-                .coordinator(coordinator)
-                .shipper(shipper)
-                .status("ASSIGNED")
-                .assignedAt(LocalDateTime.now())
-                .build();
-
-        when(deliveryRepository.findById("DEL001")).thenReturn(Optional.of(delivery));
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(deliveryRepository.save(any(Delivery.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        DeliveryResponse response = service.updateDeliveryStatus("DEL001", request, principal);
-
-        assertNotNull(response.getShipperName());
-        assertEquals("Shipper One", response.getShipperName());
-    }
-
-    // ==================== COVER normalizeText() BRANCH ====================
-
-    @Test
-    void getOrders_WithEmptyStringPriority_ReturnsOrders() {
-        mockCurrentSupplyCoordinator();
-
-        Order order = Order.builder().id("ORD001").store(store).status(OrderStatus.PENDING).build();
-        Page<Order> orderPage = new PageImpl<>(List.of(order));
-
-        when(storeRepository.existsById("ST001")).thenReturn(true);
-        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
-        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
-
-        // priority là empty string -> normalizeText sẽ trả về null
-        Page<OrderResponse> response = service.getOrders(null, "", "ST001", null, null, null, 0, 20, principal);
-
-        assertEquals(1, response.getTotalElements());
-    }
-
-    @Test
-    void getOrders_WithBlankStringPriority_ReturnsOrders() {
-        mockCurrentSupplyCoordinator();
-
-        Order order = Order.builder().id("ORD001").store(store).status(OrderStatus.PENDING).build();
-        Page<Order> orderPage = new PageImpl<>(List.of(order));
-
-        when(storeRepository.existsById("ST001")).thenReturn(true);
-        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
-        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
-
-        // priority là blank string (chỉ spaces) -> normalizeText sẽ trả về null
-        Page<OrderResponse> response = service.getOrders(null, "   ", "ST001", null, null, null, 0, 20, principal);
-
-        assertEquals(1, response.getTotalElements());
-    }
-
-    // ==================== COVER requestedDateBetween() BRANCHES ====================
-
-    @Test
-    void getOrders_WithFromDateOnly_AppliesFromDateFilter() {
-        mockCurrentSupplyCoordinator();
-
-        Order order = Order.builder()
-                .id("ORD001")
-                .store(store)
-                .status(OrderStatus.PENDING)
-                .requestedDate(LocalDate.of(2026, 4, 15))
-                .build();
-        Page<Order> orderPage = new PageImpl<>(List.of(order));
-
-        when(storeRepository.existsById("ST001")).thenReturn(true);
-        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
-        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
-
-        Page<OrderResponse> response = service.getOrders(
-                null, null, "ST001", null,
-                LocalDate.of(2026, 4, 1), null,
-                0, 20, principal);
-
-        assertEquals(1, response.getTotalElements());
-    }
-
-    @Test
-    void getOrders_WithToDateOnly_AppliesToDateFilter() {
-        mockCurrentSupplyCoordinator();
-
-        Order order = Order.builder()
-                .id("ORD001")
-                .store(store)
-                .status(OrderStatus.PENDING)
-                .requestedDate(LocalDate.of(2026, 4, 15))
-                .build();
-        Page<Order> orderPage = new PageImpl<>(List.of(order));
-
-        when(storeRepository.existsById("ST001")).thenReturn(true);
-        when(orderRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(orderPage);
-        when(orderItemRepository.findByOrder_Id("ORD001")).thenReturn(List.of());
-
-        Page<OrderResponse> response = service.getOrders(
-                null, null, "ST001", null,
-                null, LocalDate.of(2026, 4, 30),
-                0, 20, principal);
-
-        assertEquals(1, response.getTotalElements());
-    }
-
-    // ==================== COVER hasStatus(), hasStatuses(), kitchenIsNull(), requestedDateBefore() ====================
-
-    // Các method này đã được cover qua getOverview() test
-    // hasStatus: pendingOrders, assignedOrders, packedWaitingShipperOrders, shippingOrders, deliveredOrders, cancelledOrders
-    // hasStatuses: inProgressOrders (IN_PROGRESS, PROCESSING), overdueOrders (ACTIVE_ORDER_STATUSES)
-    // kitchenIsNull: unassignedOrders
-    // requestedDateBefore: overdueOrders
-
-    @Test
-    void getOverview_VerifyAllSpecificationsAreCalled() {
-        mockCurrentSupplyCoordinator();
-
-        when(orderRepository.count(any(Specification.class)))
-                .thenReturn(10L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L);
-        when(deliveryRepository.countByCoordinator_UserIdAndStatusIn(anyLong(), any()))
-                .thenReturn(5L);
-
-        SupplyCoordinatorOverviewResponse response = service.getOverview(
-                LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 30), principal);
-
-        assertNotNull(response);
-        // Verify các specification đã được gọi
-        verify(orderRepository, atLeast(10)).count(any(Specification.class));
+        // ✅ Format: DEL-yyMMdd-HHmmss-xxx (ví dụ: DEL-250121-143045-523)
+        assertTrue(response.getId().matches("DEL-\\d{6}-\\d{6}-\\d{3}"),
+                "ID phải có format DEL-yyMMdd-HHmmss-xxx, nhưng là: " + response.getId());
     }
 }

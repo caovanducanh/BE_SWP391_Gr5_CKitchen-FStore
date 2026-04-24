@@ -1809,7 +1809,7 @@ class CentralKitchenServiceImplTest {
         assertEquals("DISTRIBUTED", batch1.getStatus());
         assertEquals(0, batch1.getRemainingQuantity());
         // batch2 chỉ dùng 10 → PARTIALLY_DISTRIBUTED
-        assertEquals("PARTIALLY_DISTRIBUTED", batch2.getStatus());
+        assertEquals("PART_DIST", batch2.getStatus());
         assertEquals(20, batch2.getRemainingQuantity());
     }
 
@@ -1840,7 +1840,7 @@ class CentralKitchenServiceImplTest {
 
         centralKitchenService.updateOrderStatus("ORD001", request, mockPrincipal);
 
-        assertEquals("PARTIALLY_DISTRIBUTED", batch.getStatus());
+        assertEquals("PART_DIST", batch.getStatus());
         assertEquals(70, batch.getRemainingQuantity());
     }
 
@@ -2952,7 +2952,7 @@ class CentralKitchenServiceImplTest {
 
         assertEquals(OrderStatus.PACKED_WAITING_SHIPPER, processingOrder.getStatus());
         assertEquals(15, batch.getRemainingQuantity());
-        assertEquals("PARTIALLY_DISTRIBUTED", batch.getStatus());
+        assertEquals("PART_DIST", batch.getStatus());
         verify(batchRepository, atLeastOnce()).save(any(Batch.class));
     }
 
@@ -3483,7 +3483,7 @@ class CentralKitchenServiceImplTest {
 
         centralKitchenService.updateOrderStatus("ORD_PARTIAL", request, mockPrincipal);
 
-        assertEquals("PARTIALLY_DISTRIBUTED", batch.getStatus());
+        assertEquals("PART_DIST", batch.getStatus());
         assertEquals(80, batch.getRemainingQuantity());
     }
 

@@ -1,5 +1,15 @@
 package com.example.demologin.controller;
 
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.example.demologin.annotation.ApiResponse;
 import com.example.demologin.annotation.AuthenticatedEndpoint;
 import com.example.demologin.annotation.PageResponse;
@@ -11,12 +21,12 @@ import com.example.demologin.entity.User;
 import com.example.demologin.enums.UserStatus;
 import com.example.demologin.service.UserService;
 import com.example.demologin.utils.AccountUtils;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -81,7 +91,7 @@ public class UserController {
     @AuthenticatedEndpoint
     @Operation(summary = "Get current user profile", description = "Retrieve profile of the authenticated user")
     public Object getCurrentUserProfile() {
-        User currentUser = accountUtils.getCurrentUser();
+        User currentUser = accountUtils.getCurrentUserWithStore();
         return  UserResponse.toUserResponse(currentUser);
     }
 }

@@ -13,11 +13,6 @@ public class StrongPasswordValidator implements ConstraintValidator<StrongPasswo
     private boolean requireDigit;
     private boolean requireSpecialChar;
     
-    // Common weak passwords to blacklist
-    private static final String[] WEAK_PASSWORDS = {
-        "password", "123456", "123456789", "qwerty", "abc123", 
-        "password123", "admin", "letmein", "welcome", "monkey"
-    };
     
     @Override
     public void initialize(StrongPassword constraintAnnotation) {
@@ -40,13 +35,6 @@ public class StrongPasswordValidator implements ConstraintValidator<StrongPasswo
             return false;
         }
         
-        // Check for weak passwords
-        for (String weak : WEAK_PASSWORDS) {
-            if (password.toLowerCase().contains(weak.toLowerCase())) {
-                updateErrorMessage(context, "Password contains common weak patterns");
-                return false;
-            }
-        }
         
         // Check uppercase requirement
         if (requireUppercase && !Pattern.compile("[A-Z]").matcher(password).find()) {
@@ -72,30 +60,7 @@ public class StrongPasswordValidator implements ConstraintValidator<StrongPasswo
             return false;
         }
         
-        // Check for too many repeated characters
-        if (hasRepeatedCharacters(password, 3)) {
-            updateErrorMessage(context, "Password cannot have more than 2 consecutive identical characters");
-            return false;
-        }
-        
         return true;
-    }
-    
-    private boolean hasRepeatedCharacters(String password, int maxRepeat) {
-        for (int i = 0; i <= password.length() - maxRepeat; i++) {
-            char current = password.charAt(i);
-            boolean repeated = true;
-            for (int j = 1; j < maxRepeat; j++) {
-                if (password.charAt(i + j) != current) {
-                    repeated = false;
-                    break;
-                }
-            }
-            if (repeated) {
-                return true;
-            }
-        }
-        return false;
     }
     
     private void updateErrorMessage(ConstraintValidatorContext context, String message) {

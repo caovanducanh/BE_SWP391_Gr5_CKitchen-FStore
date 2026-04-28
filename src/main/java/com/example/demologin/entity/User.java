@@ -62,6 +62,7 @@ public class User implements UserDetails {
     @Column(nullable = false, length = 10)
     private UserStatus status;
 
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 
@@ -187,6 +188,7 @@ public class User implements UserDetails {
     public void setFullName(String fullName) {
         this.fullName = fullName;
     }
+
 
     public Store getStore() {
         return store;

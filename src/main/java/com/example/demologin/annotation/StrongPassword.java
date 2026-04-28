@@ -9,13 +9,13 @@ import java.lang.annotation.*;
 @Target({ElementType.METHOD, ElementType.FIELD, ElementType.ANNOTATION_TYPE, ElementType.CONSTRUCTOR, ElementType.PARAMETER})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface StrongPassword {
-    String message() default "Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one digit, and one special character";
+    String message() default "Mật khẩu không hợp lệ";
     Class<?>[] groups() default {};
     Class<? extends Payload>[] payload() default {};
     
-    int minLength() default 8;
-    boolean requireUppercase() default true;
-    boolean requireLowercase() default true;
-    boolean requireDigit() default true;
-    boolean requireSpecialChar() default true;
+    int minLength() default 1;
+    boolean requireUppercase() default false;
+    boolean requireLowercase() default false;
+    boolean requireDigit() default false;
+    boolean requireSpecialChar() default false;
 }

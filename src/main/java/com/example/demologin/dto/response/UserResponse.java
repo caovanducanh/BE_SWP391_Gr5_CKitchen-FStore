@@ -24,6 +24,16 @@ public class UserResponse {
     private Gender gender;
     private UserStatus status;
     private LocalDateTime createdDate;
+    private String storeId;
+    private String storeName;
+    private String storeAddress;
+    private String storePhone;
+    
+    private String kitchenId;
+    private String kitchenName;
+    private String kitchenAddress;
+    private String kitchenPhone;
+
     private String token;
     private String refreshToken;
 
@@ -40,6 +50,14 @@ public class UserResponse {
                 .gender(null)
                 .status(user.getStatus())
                 .createdDate(user.getCreatedAt())
+                .storeId(user.getStore() != null ? user.getStore().getId() : null)
+                .storeName(user.getStore() != null ? user.getStore().getName() : null)
+                .storeAddress(user.getStore() != null ? user.getStore().getAddress() : null)
+                .storePhone(user.getStore() != null ? user.getStore().getPhone() : null)
+                .kitchenId(user.getKitchen() != null ? user.getKitchen().getId() : null)
+                .kitchenName(user.getKitchen() != null ? user.getKitchen().getName() : null)
+                .kitchenAddress(user.getKitchen() != null ? user.getKitchen().getAddress() : null)
+                .kitchenPhone(user.getKitchen() != null ? user.getKitchen().getPhone() : null)
                 .build();
     }
 }

@@ -3,16 +3,21 @@ package com.example.demologin.repository;
 import java.util.List;
 import java.util.Optional;
 
-import com.example.demologin.enums.UserStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.example.demologin.entity.User;
+import com.example.demologin.enums.UserStatus;
 
 
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
+
+    @EntityGraph(attributePaths = {"store"})
+    Optional<User> findWithStoreByUsername(String username);
+
     Optional<User> findByEmail(String email);
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);

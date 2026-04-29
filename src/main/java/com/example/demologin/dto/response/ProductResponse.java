@@ -18,7 +18,6 @@ public class ProductResponse {
     private BigDecimal price;
     private BigDecimal cost;
     private List<String> imageUrl;
-    private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

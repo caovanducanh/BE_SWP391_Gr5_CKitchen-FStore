@@ -26,10 +26,6 @@ public class ProductionPlan {
     @JoinColumn(name = "kitchen_id")
     private Kitchen kitchen;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id")
-    private Order order;
-
     @Column(nullable = false)
     private Integer quantity;
 

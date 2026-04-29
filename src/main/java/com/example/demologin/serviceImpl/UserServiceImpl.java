@@ -87,61 +87,36 @@ public class UserServiceImpl implements UserService {
         }
 
         String normalizedRoleName = request.getRoleName().trim();
-        System.out.println("Creating user with request: email=" + request.getEmail() + ", username=" + request.getUsername() + ", fullName=" + request.getFullName());
         Role role = roleRepository.findByName(normalizedRoleName)
                 .orElseThrow(() -> new NotFoundException("Role " + normalizedRoleName + " not found"));
 
         Store store = null;
         Kitchen kitchen = null;
-        
-        if (request.getStoreId() != null && !request.getStoreId().isBlank()) {
+        if (ROLE_STORE_STAFF.equalsIgnoreCase(normalizedRoleName)) {
+            if (request.getStoreId() == null || request.getStoreId().isBlank()) {
+                throw new BadRequestException("Store is required for store staff role");
+            }
             store = storeRepository.findById(request.getStoreId().trim())
                     .orElseThrow(() -> new NotFoundException("Store not found: " + request.getStoreId()));
         }
-        
-        if (request.getKitchenId() != null && !request.getKitchenId().isBlank()) {
+        if (ROLE_KITCHEN_STAFF.equalsIgnoreCase(normalizedRoleName)) {
+            if (request.getKitchenId() == null || request.getKitchenId().isBlank()) {
+                throw new BadRequestException("Kitchen is required for kitchen staff role");
+            }
             kitchen = kitchenRepository.findById(request.getKitchenId().trim())
                     .orElseThrow(() -> new NotFoundException("Kitchen not found: " + request.getKitchenId()));
         }
 
-        // Specific mandatory checks for staff roles
-        if (ROLE_STORE_STAFF.equalsIgnoreCase(normalizedRoleName) && store == null) {
-            throw new BadRequestException("Store is required for store staff role");
-        }
-        if (ROLE_KITCHEN_STAFF.equalsIgnoreCase(normalizedRoleName) && kitchen == null) {
-            throw new BadRequestException("Kitchen is required for kitchen staff role");
-        }
-
-        String username = (request.getUsername() != null && !request.getUsername().isBlank())
-                ? request.getUsername().trim()
-                : generatePendingUsername();
-        
-        if (request.getUsername() != null && !request.getUsername().isBlank() && userRepository.existsByUsername(username)) {
-            throw new ConflictException("Username already exists");
-        }
-
-        String rawPassword = (request.getPassword() != null && !request.getPassword().isBlank())
-                ? request.getPassword()
-                : generateTempPassword();
-        
-        String fullName = (request.getFullName() != null && !request.getFullName().isBlank())
-                ? request.getFullName().trim()
-                : "Chưa cập nhật";
-
         User user = new User(
-                username,
-                passwordEncoder.encode(rawPassword),
-                fullName,
+                generatePendingUsername(),
+                passwordEncoder.encode(generateTempPassword()),
+                "Chưa cập nhật",
                 request.getEmail().trim()
         );
         user.setRole(role);
-        user.setStatus(request.getStatus() != null ? request.getStatus() : UserStatus.ACTIVE);
-        
-        // If admin provides username/password, we consider it verified (or at least skips the invite-only flow)
-        boolean isManual = (request.getUsername() != null && !request.getUsername().isBlank());
-        user.setVerify(isManual); 
+        user.setStatus(UserStatus.ACTIVE);
+        user.setVerify(false);
         user.setLocked(false);
-
         if (store != null) {
             user.setStore(store);
         }
@@ -150,12 +125,7 @@ public class UserServiceImpl implements UserService {
         }
 
         User savedUser = userRepository.save(user);
-        
-        // Only send invite email if it's not a fully manual creation
-        if (!isManual) {
-            sendInviteEmail(savedUser);
-        }
-        
+        sendInviteEmail(savedUser);
         return userMapper.toUserResponse(savedUser);
     }
 
@@ -194,26 +164,6 @@ public class UserServiceImpl implements UserService {
 
         if (request.getLocked() != null) {
             user.setLocked(request.getLocked());
-        }
-
-        if (request.getStoreId() != null) {
-            if (request.getStoreId().isBlank()) {
-                user.setStore(null);
-            } else {
-                Store store = storeRepository.findById(request.getStoreId().trim())
-                        .orElseThrow(() -> new NotFoundException("Store not found: " + request.getStoreId()));
-                user.setStore(store);
-            }
-        }
-
-        if (request.getKitchenId() != null) {
-            if (request.getKitchenId().isBlank()) {
-                user.setKitchen(null);
-            } else {
-                Kitchen kitchen = kitchenRepository.findById(request.getKitchenId().trim())
-                        .orElseThrow(() -> new NotFoundException("Kitchen not found: " + request.getKitchenId()));
-                user.setKitchen(kitchen);
-            }
         }
 
         User updatedUser = userRepository.save(user);

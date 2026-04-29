@@ -17,7 +17,6 @@ public interface ProductRepository extends JpaRepository<Product, String> {
 						FROM Product p
 						WHERE (:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.id) LIKE LOWER(CONCAT('%', :search, '%')))
 							AND (:category IS NULL OR p.category = :category)
-							AND p.status <> 'DELETED'
 						""")
 		Page<Product> searchProducts(@Param("search") String search,
 																 @Param("category") ProductCategory category,

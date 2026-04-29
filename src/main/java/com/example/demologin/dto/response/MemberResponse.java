@@ -26,10 +26,8 @@ public class MemberResponse {
     private LocalDate dateOfBirth;
     private UserStatus status;
     private String role;
-    private String storeId;
-    private String kitchenId;
 
-    public MemberResponse(Long userId, String username, String email, String identity_Card, String fullName, String phone, String address, LocalDate dateOfBirth, UserStatus status, String role, String storeId, String kitchenId) {
+    public MemberResponse(Long userId, String username, String email, String identity_Card, String fullName, String phone, String address, LocalDate dateOfBirth, UserStatus status, String role) {
         this.userId = userId;
         this.username = username;
         this.email = email;
@@ -40,8 +38,6 @@ public class MemberResponse {
         this.dateOfBirth = dateOfBirth;
         this.status = status;
         this.role = role;
-        this.storeId = storeId;
-        this.kitchenId = kitchenId;
     }
 }
 

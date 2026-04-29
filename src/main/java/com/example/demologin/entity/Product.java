@@ -53,13 +53,6 @@ public class Product {
     @Builder.Default
     private List<String> imageUrl = new ArrayList<>();
 
-    @Builder.Default
-    @Column(nullable = false, length = 20)
-    private String status = "ACTIVE";
-
-    public static final String STATUS_ACTIVE = "ACTIVE";
-    public static final String STATUS_DELETED = "DELETED";
-
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

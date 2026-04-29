@@ -20,8 +20,4 @@ public class AdminUpdateUserRequest {
     private Boolean verify;
 
     private Boolean locked;
-
-    private String storeId;
-
-    private String kitchenId;
 }

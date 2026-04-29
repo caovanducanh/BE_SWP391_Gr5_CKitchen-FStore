@@ -22,9 +22,7 @@ public class UserMapper {
                 null,
                 null,
                 user.getStatus(),
-                roleName,
-                user.getStore() != null ? user.getStore().getId() : null,
-                user.getKitchen() != null ? user.getKitchen().getId() : null
+                roleName
         );
     }
     public static User toEntity(UserRequest userRequest) {

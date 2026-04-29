@@ -18,6 +18,7 @@ public class ProductMapper {
                 .price(product.getPrice())
                 .cost(product.getCost())
                 .imageUrl(product.getImageUrl() == null ? new ArrayList<>() : product.getImageUrl())
+                .status(product.getStatus())
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();

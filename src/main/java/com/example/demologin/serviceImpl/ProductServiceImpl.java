@@ -195,7 +195,9 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public void deleteProduct(String id) {
         Product product = findProductById(id);
-        productRepository.delete(product);
+        product.setStatus(Product.STATUS_DELETED);
+        product.setUpdatedAt(LocalDateTime.now());
+        productRepository.save(product);
     }
 
     private Product findProductById(String id) {

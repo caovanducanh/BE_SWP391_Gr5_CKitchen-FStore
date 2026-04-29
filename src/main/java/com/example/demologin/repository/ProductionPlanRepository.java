@@ -9,4 +9,5 @@ import java.util.Collection;
 @Repository
 public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, String> {
     long countByStatusIn(Collection<String> statuses);
+    java.util.List<ProductionPlan> findByOrder_Id(String orderId);
 }

@@ -11,6 +11,7 @@ import java.util.List;
 @Builder
 public class ProductionPlanResponse {
     private String id;
+    private String orderId;
     private String productId;
     private String productName;
     private String kitchenId;

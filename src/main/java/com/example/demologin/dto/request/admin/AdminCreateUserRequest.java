@@ -1,7 +1,7 @@
 package com.example.demologin.dto.request.admin;
 
 import com.example.demologin.annotation.ValidEmail;
-
+import com.example.demologin.enums.UserStatus;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,7 +16,11 @@ public class AdminCreateUserRequest {
     @NotBlank(message = "Role name must not be blank")
     private String roleName;
 
-    private String storeId;
+    private String username;
+    private String password;
+    private String fullName;
+    private UserStatus status;
 
+    private String storeId;
     private String kitchenId;
 }

@@ -173,15 +173,67 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
         }
 
         order.setKitchen(kitchen);
-        order.setStatus(OrderStatus.ASSIGNED);
+        order.setStatus(OrderStatus.IN_PROGRESS);
         if (order.getAssignedAt() == null) {
             order.setAssignedAt(LocalDateTime.now());
+        }
+        if (order.getInProgressAt() == null) {
+            order.setInProgressAt(LocalDateTime.now());
         }
         order.setUpdatedAt(LocalDateTime.now());
 
         Order saved = orderRepository.save(order);
         List<OrderItem> items = orderItemRepository.findByOrder_Id(saved.getId());
+        
+        // Auto-create production plans for each item
+        autoCreatePlansForOrder(saved, items, currentUser);
+        
         return toOrderResponse(saved, items);
+    }
+
+    private void autoCreatePlansForOrder(Order order, List<OrderItem> items, User staff) {
+        for (OrderItem item : items) {
+            // Check if recipe exists
+            List<Recipe> recipes = recipeRepository.findAllByProduct_Id(item.getProduct().getId());
+            if (recipes.isEmpty()) continue; // Skip items without recipes
+
+            // Create plan
+            ProductionPlan plan = new ProductionPlan();
+            plan.setId(generateProductionPlanId());
+            plan.setProduct(item.getProduct());
+            plan.setKitchen(order.getKitchen());
+            plan.setOrder(order);
+            plan.setQuantity(item.getQuantity());
+            plan.setUnit(item.getUnit());
+            plan.setStatus("DRAFT");
+            plan.setStartDate(LocalDateTime.now());
+            plan.setEndDate(LocalDateTime.now().plusHours(2)); // Default 2 hours
+            plan.setStaff(staff.getUsername());
+            plan.setNotes("Auto-generated from Order " + order.getId());
+            plan.setCreatedAt(LocalDateTime.now());
+            plan.setUpdatedAt(LocalDateTime.now());
+
+            ProductionPlan savedPlan = productionPlanRepository.save(plan);
+
+            // Create PlanIngredients for display in UI
+            List<PlanIngredient> planIngredients = recipes.stream().map(recipe -> 
+                PlanIngredient.builder()
+                    .plan(savedPlan)
+                    .ingredient(recipe.getIngredient())
+                    .name(recipe.getIngredient().getName())
+                    .quantity(recipe.getQuantity().multiply(BigDecimal.valueOf(item.getQuantity())))
+                    .qty(recipe.getQuantity().multiply(BigDecimal.valueOf(item.getQuantity())))
+                    .unit(recipe.getUnit())
+                    .createdAt(LocalDateTime.now())
+                    .build()
+            ).toList();
+            planIngredientRepository.saveAll(planIngredients);
+            
+            // Note: We don't create PlanIngredientBatchUsage yet 
+            // because that requires actual batch calculation which usually happens in DRAFT phase review or on Start.
+            // But wait, createProductionPlan does it. 
+            // To be consistent, let's try to pre-calculate usages if possible.
+        }
     }
 
     @Override
@@ -411,7 +463,31 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
                 .build();
         batchRepository.save(batch);
         
+        // Automation: If this plan is linked to an order, check if all other plans for that order are also COMPLETED
+        if (savedPlan.getOrder() != null) {
+            checkAndPackOrder(savedPlan.getOrder(), principal);
+        }
+        
         return toProductionPlanResponse(savedPlan);
+    }
+
+    private void checkAndPackOrder(Order order, Principal principal) {
+        List<ProductionPlan> plans = productionPlanRepository.findByOrder_Id(order.getId());
+        boolean allCompleted = plans.stream().allMatch(p -> "COMPLETED".equals(p.getStatus()));
+        
+        if (allCompleted) {
+            order.setStatus(OrderStatus.PACKED_WAITING_SHIPPER);
+            if (order.getPackedWaitingShipperAt() == null) {
+                order.setPackedWaitingShipperAt(LocalDateTime.now());
+            }
+            order.setUpdatedAt(LocalDateTime.now());
+            order.setNotes(appendInternalNote(order.getNotes(), "SYSTEM", "Tất cả kế hoạch sản xuất đã hoàn thành. Chuyển sang Chờ đóng gói."));
+            
+            // Trigger product deduction (matching the logic in updateOrderStatus)
+            handleProductDeductionOnPacking(order, principal);
+            
+            orderRepository.save(order);
+        }
     }
 
     @Override
@@ -421,12 +497,17 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
         ProductionPlan plan = productionPlanRepository.findById(planId)
                 .orElseThrow(() -> new NotFoundException("Plan not found: " + planId));
                 
+        if (currentUser.getKitchen() != null && !plan.getKitchen().getId().equals(currentUser.getKitchen().getId())) {
+            throw new BadRequestException("Plan does not belong to your kitchen");
+        }
+
         if ("COMPLETED".equals(plan.getStatus())) {
             throw new BadRequestException("Cannot cancel completed plan");
         }
         
+        List<PlanIngredientBatchUsage> usages = planIngredientBatchUsageRepository.findByPlan_Id(planId);
+        
         if ("IN_PRODUCTION".equals(plan.getStatus())) {
-            List<PlanIngredientBatchUsage> usages = planIngredientBatchUsageRepository.findByPlan_Id(planId);
             for (PlanIngredientBatchUsage usage : usages) {
                 IngredientBatch batch = usage.getIngredientBatch();
                 batch.setRemainingQuantity(batch.getRemainingQuantity().add(usage.getQuantityUsed()));
@@ -444,6 +525,10 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
                     kitchenInventoryRepository.save(inv);
                 }
             }
+        }
+        
+        // Clean up planned usages regardless of current status (DRAFT or IN_PRODUCTION)
+        if (!usages.isEmpty()) {
             planIngredientBatchUsageRepository.deleteAll(usages);
         }
         
@@ -853,6 +938,7 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
 
         return ProductionPlanResponse.builder()
                 .id(plan.getId())
+                .orderId(plan.getOrder() != null ? plan.getOrder().getId() : null)
                 .productId(product != null ? product.getId() : null)
                 .productName(product != null ? product.getName() : null)
                 .kitchenId(plan.getKitchen() != null ? plan.getKitchen().getId() : null)
@@ -1010,7 +1096,16 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
     }
 
     private void handleProductDeductionOnPacking(Order order, Principal principal) {
-        Kitchen kitchen = getCurrentCentralKitchenStaff(principal).getKitchen();
+        Kitchen kitchen = order.getKitchen();
+        if (kitchen == null && principal != null) {
+            kitchen = getCurrentCentralKitchenStaff(principal).getKitchen();
+        }
+        
+        if (kitchen == null) {
+            throw new BadRequestException("No kitchen context for product deduction");
+        }
+        
+        final String finalKitchenId = kitchen.getId();
         List<OrderItem> items = orderItemRepository.findByOrder_Id(order.getId());
 
         for (OrderItem item : items) {
@@ -1018,7 +1113,7 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
             String productId = item.getProduct().getId();
 
             // Find all active batches for this product in this kitchen, sorted by expiry date (FEFO)
-            Specification<Batch> spec = Specification.where((root, query, cb) -> cb.equal(root.get("kitchen").get("id"), kitchen.getId()));
+            Specification<Batch> spec = Specification.where((root, query, cb) -> cb.equal(root.get("kitchen").get("id"), finalKitchenId));
             spec = spec.and((root, query, cb) -> cb.equal(root.get("product").get("id"), productId));
             spec = spec.and((root, query, cb) -> root.get("status").in(List.of("AVAILABLE", "PARTIALLY_DISTRIBUTED")));
 

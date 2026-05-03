@@ -253,7 +253,34 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
         order.setUpdatedAt(LocalDateTime.now());
         orderRepository.save(order);
 
+        // Update Store Inventory
+        updateStoreInventory(order);
+
         return toDeliveryResponse(deliveryRepository.save(delivery));
+    }
+
+    private void updateStoreInventory(Order order) {
+        Store store = order.getStore();
+        List<OrderItem> items = orderItemRepository.findByOrder_Id(order.getId());
+
+        for (OrderItem item : items) {
+            Product product = item.getProduct();
+            int quantityReceived = item.getQuantity();
+
+            StoreInventory inventory = storeInventoryRepository
+                    .findByStoreIdAndProductId(store.getId(), product.getId())
+                    .orElseGet(() -> StoreInventory.builder()
+                            .store(store)
+                            .product(product)
+                            .quantity(0)
+                            .unit(product.getUnit())
+                            .minStock(10) // Default min stock
+                            .build());
+
+            inventory.setQuantity(inventory.getQuantity() + quantityReceived);
+            inventory.setUpdatedAt(LocalDateTime.now());
+            storeInventoryRepository.save(inventory);
+        }
     }
 
     @Override

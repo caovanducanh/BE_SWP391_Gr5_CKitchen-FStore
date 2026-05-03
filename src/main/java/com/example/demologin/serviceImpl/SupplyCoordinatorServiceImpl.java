@@ -91,7 +91,7 @@ public class SupplyCoordinatorServiceImpl implements SupplyCoordinatorService {
     public Page<KitchenResponse> getKitchens(int page, int size, Principal principal) {
         validateSupplyCoordinator(principal);
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name"));
-        return kitchenRepository.findAll(pageRequest)
+        return kitchenRepository.findByStatus("ACTIVE", pageRequest)
                 .map(this::toKitchenResponse);
     }
 

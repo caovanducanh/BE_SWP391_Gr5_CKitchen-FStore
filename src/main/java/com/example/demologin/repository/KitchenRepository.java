@@ -12,6 +12,7 @@ public interface KitchenRepository extends JpaRepository<Kitchen, String> {
 	Page<Kitchen> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
 	Page<Kitchen> findByStatus(String status, Pageable pageable);
+	java.util.List<Kitchen> findByStatus(String status);
 
 	Page<Kitchen> findByNameContainingIgnoreCaseAndStatus(String name, String status, Pageable pageable);
 

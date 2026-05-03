@@ -16,6 +16,7 @@ import com.example.demologin.entity.Product;
 import com.example.demologin.entity.SaleItem;
 import com.example.demologin.entity.SalesRecord;
 import com.example.demologin.entity.Store;
+import com.example.demologin.entity.Kitchen;
 import com.example.demologin.entity.StoreInventory;
 import com.example.demologin.entity.User;
 import com.example.demologin.exception.exceptions.BadRequestException;
@@ -536,7 +537,9 @@ public class SalesReportServiceImpl implements SalesReportService {
             @Override
             @Transactional(readOnly = true)
             public List<KitchenResponse> getAllKitchensForRevenueFilter() {
-            return kitchenRepository.findAll(Sort.by(Sort.Direction.ASC, "id")).stream()
+            List<Kitchen> kitchens = kitchenRepository.findByStatus("ACTIVE");
+            kitchens.sort(java.util.Comparator.comparing(Kitchen::getId));
+            return kitchens.stream()
                 .map(kitchen -> KitchenResponse.builder()
                     .id(kitchen.getId())
                     .name(kitchen.getName())

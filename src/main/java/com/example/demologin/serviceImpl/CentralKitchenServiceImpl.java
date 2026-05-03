@@ -181,7 +181,32 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
 
         Order saved = orderRepository.save(order);
         List<OrderItem> items = orderItemRepository.findByOrder_Id(saved.getId());
+
+        // Automatic production plan creation upon reception
+        autoCreateProductionPlans(saved, principal);
+
         return toOrderResponse(saved, items);
+    }
+
+    private void autoCreateProductionPlans(Order order, Principal principal) {
+        List<OrderItem> items = orderItemRepository.findByOrder_Id(order.getId());
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startDate = now;
+        LocalDateTime endDate = order.getRequestedDate() != null ? order.getRequestedDate().atTime(17, 0) : startDate.plusDays(1);
+        if (!endDate.isAfter(startDate)) {
+            endDate = startDate.plusHours(4);
+        }
+
+        for (OrderItem item : items) {
+            internalCreateProductionPlan(
+                item.getProduct().getId(),
+                item.getQuantity(),
+                startDate,
+                endDate,
+                "Auto-generated from order " + order.getId(),
+                principal
+            );
+        }
     }
 
     @Override
@@ -249,22 +274,34 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
     @Override
     @Transactional
     public ProductionPlanResponse createProductionPlan(CreateProductionPlanRequest request, Principal principal) {
+        ProductionPlan savedPlan = internalCreateProductionPlan(
+            request.getProductId(),
+            request.getQuantity(),
+            request.getStartDate(),
+            request.getEndDate(),
+            request.getNotes(),
+            principal
+        );
+        return toProductionPlanResponse(savedPlan);
+    }
+
+    private ProductionPlan internalCreateProductionPlan(String productId, Integer quantity, LocalDateTime startDate, LocalDateTime endDate, String notes, Principal principal) {
         User currentUser = getCurrentCentralKitchenStaff(principal);
         Kitchen kitchen = currentUser.getKitchen();
         if (kitchen == null) {
             throw new BadRequestException("You are not assigned to any kitchen");
         }
 
-        if (!request.getEndDate().isAfter(request.getStartDate())) {
+        if (!endDate.isAfter(startDate)) {
             throw new BadRequestException("endDate must be after startDate");
         }
 
-        Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new NotFoundException("Product not found: " + request.getProductId()));
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new NotFoundException("Product not found: " + productId));
 
         List<Recipe> recipes = recipeRepository.findAllByProduct_Id(product.getId());
         if (recipes.isEmpty()) {
-            throw new BadRequestException("Product has no recipe defined");
+            throw new BadRequestException("Product has no recipe defined: " + product.getName());
         }
 
         List<PlanIngredient> planIngredients = new ArrayList<>();
@@ -274,7 +311,7 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
         tempPlan.setId(generateProductionPlanId());
         
         for (Recipe recipe : recipes) {
-            BigDecimal requiredTotal = recipe.getQuantity().multiply(BigDecimal.valueOf(request.getQuantity()));
+            BigDecimal requiredTotal = recipe.getQuantity().multiply(BigDecimal.valueOf(quantity));
             
             List<IngredientBatch> batches = ingredientBatchRepository.findActiveByKitchenAndIngredientOrderByExpiryAsc(
                     kitchen.getId(), recipe.getIngredient().getId());
@@ -295,7 +332,7 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
             }
             
             if (remainingToFulfill.compareTo(BigDecimal.ZERO) > 0) {
-                throw new BadRequestException("Not enough ingredient: " + recipe.getIngredient().getName() + ". Short by: " + remainingToFulfill + " " + recipe.getUnit());
+                throw new BadRequestException("Not enough ingredient: " + recipe.getIngredient().getName() + " for product " + product.getName() + ". Short by: " + remainingToFulfill + " " + recipe.getUnit());
             }
             
             planIngredients.add(PlanIngredient.builder()
@@ -311,13 +348,13 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
 
         tempPlan.setProduct(product);
         tempPlan.setKitchen(kitchen);
-        tempPlan.setQuantity(request.getQuantity());
+        tempPlan.setQuantity(quantity);
         tempPlan.setUnit(product.getUnit());
         tempPlan.setStatus("DRAFT");
-        tempPlan.setStartDate(request.getStartDate());
-        tempPlan.setEndDate(request.getEndDate());
+        tempPlan.setStartDate(startDate);
+        tempPlan.setEndDate(endDate);
         tempPlan.setStaff(principal.getName());
-        tempPlan.setNotes(request.getNotes());
+        tempPlan.setNotes(notes);
         tempPlan.setCreatedAt(LocalDateTime.now());
         tempPlan.setUpdatedAt(LocalDateTime.now());
 
@@ -329,7 +366,7 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
         planIngredientRepository.saveAll(planIngredients);
         planIngredientBatchUsageRepository.saveAll(usages);
 
-        return toProductionPlanResponse(savedPlan);
+        return savedPlan;
     }
 
     @Override
@@ -1043,7 +1080,7 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
                 } else {
                     batch.setRemainingQuantity(batchRemaining - remainingToDeduct);
                     remainingToDeduct = 0;
-                    batch.setStatus("PART_DIST");
+                    batch.setStatus("PARTIALLY_DISTRIBUTED");
                 }
                 batch.setUpdatedAt(LocalDateTime.now());
                 batchRepository.save(batch);

@@ -42,6 +42,9 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
 
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
+
     @Value("${minio.endpoint}")
     private String minioEndpoint;
 
@@ -193,9 +196,49 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public void deleteProduct(String id) {
         Product product = findProductById(id);
+
+        log.info("Performing cascading hard delete for product: {}", id);
+
+        // 1. Delete Store Inventory
+        entityManager.createNativeQuery("DELETE FROM store_inventory WHERE product_id = :productId")
+                .setParameter("productId", id)
+                .executeUpdate();
+
+        // 2. Delete Order Items
+        entityManager.createNativeQuery("DELETE FROM order_items WHERE product_id = :productId")
+                .setParameter("productId", id)
+                .executeUpdate();
+
+        // 3. Delete Production Plans and their dependencies
+        List<String> planIds = entityManager.createNativeQuery("SELECT id FROM production_plans WHERE product_id = :productId")
+                .setParameter("productId", id)
+                .getResultList();
+
+        if (!planIds.isEmpty()) {
+            entityManager.createNativeQuery("DELETE FROM plan_ingredient_batch_usage WHERE plan_id IN (:planIds)")
+                    .setParameter("planIds", planIds)
+                    .executeUpdate();
+
+            entityManager.createNativeQuery("DELETE FROM plan_ingredients WHERE plan_id IN (:planIds)")
+                    .setParameter("planIds", planIds)
+                    .executeUpdate();
+
+            entityManager.createNativeQuery("DELETE FROM production_plans WHERE product_id = :productId")
+                    .setParameter("productId", id)
+                    .executeUpdate();
+        }
+
+        // 4. Delete Recipes
+        entityManager.createNativeQuery("DELETE FROM recipes WHERE product_id = :productId")
+                .setParameter("productId", id)
+                .executeUpdate();
+
+        // 5. Finally, delete the product itself
         productRepository.delete(product);
+        log.info("Successfully hard deleted product: {}", id);
     }
 
     private Product findProductById(String id) {

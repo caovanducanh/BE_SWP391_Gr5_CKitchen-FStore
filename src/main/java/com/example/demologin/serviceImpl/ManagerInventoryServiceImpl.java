@@ -51,7 +51,9 @@ public class ManagerInventoryServiceImpl implements ManagerInventoryService {
                             .orElseThrow(() -> new NotFoundException("Kitchen not found with id: " + normalizedKitchenId))
             );
         } else {
-            kitchens = kitchenRepository.findAll(Sort.by(Sort.Direction.ASC, "name"));
+            kitchens = kitchenRepository.findByStatus("ACTIVE");
+            // Optional: sort by name if needed, but List.sort works
+            kitchens.sort(java.util.Comparator.comparing(Kitchen::getName));
         }
 
         List<ManagerKitchenInventoryGroupResponse> grouped = kitchens.stream()
@@ -73,7 +75,9 @@ public class ManagerInventoryServiceImpl implements ManagerInventoryService {
 
     @Override
     public List<KitchenResponse> getAllKitchens() {
-        return kitchenRepository.findAll(Sort.by(Sort.Direction.ASC, "name")).stream()
+        List<Kitchen> kitchens = kitchenRepository.findByStatus("ACTIVE");
+        kitchens.sort(java.util.Comparator.comparing(Kitchen::getName));
+        return kitchens.stream()
                 .map(this::toKitchenResponse)
                 .toList();
     }

@@ -56,4 +56,8 @@ public class Product {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    @Column(length = 20)
+    @Builder.Default
+    private String status = "ACTIVE";
 }

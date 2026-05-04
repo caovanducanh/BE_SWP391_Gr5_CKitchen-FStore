@@ -22,6 +22,9 @@ import com.example.demologin.dto.response.StoreResponse;
 import com.example.demologin.entity.User;
 import com.example.demologin.enums.OrderStatus;
 import com.example.demologin.enums.ProductCategory;
+import com.example.demologin.entity.OrderItemBatch;
+import com.example.demologin.entity.StoreBatch;
+import com.example.demologin.dto.response.StoreBatchResponse;
 import com.example.demologin.exception.exceptions.NotFoundException;
 import com.example.demologin.exception.exceptions.BadRequestException;
 import com.example.demologin.mapper.ProductMapper;
@@ -31,6 +34,8 @@ import com.example.demologin.repository.OrderItemRepository;
 import com.example.demologin.repository.OrderPriorityConfigRepository;
 import com.example.demologin.repository.OrderRepository;
 import com.example.demologin.repository.ProductRepository;
+import com.example.demologin.repository.OrderItemBatchRepository;
+import com.example.demologin.repository.StoreBatchRepository;
 import com.example.demologin.repository.StoreInventoryRepository;
 import com.example.demologin.repository.StoreRepository;
 import com.example.demologin.repository.UserRepository;
@@ -65,6 +70,8 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
     private final OrderItemRepository orderItemRepository;
     private final DeliveryRepository deliveryRepository;
     private final StoreInventoryRepository storeInventoryRepository;
+    private final StoreBatchRepository storeBatchRepository;
+    private final OrderItemBatchRepository orderItemBatchRepository;
     private final StoreRepository storeRepository;
     private final KitchenRepository kitchenRepository;
     private final ProductRepository productRepository;
@@ -253,7 +260,62 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
         order.setUpdatedAt(LocalDateTime.now());
         orderRepository.save(order);
 
+        // Update inventory: detailed batches and aggregated stock
+        updateInventoryOnReceipt(order);
+
         return toDeliveryResponse(deliveryRepository.save(delivery));
+    }
+
+    private void updateInventoryOnReceipt(Order order) {
+        Store store = order.getStore();
+        LocalDateTime now = LocalDateTime.now();
+
+        // Get all items and their assigned batches
+        List<OrderItem> items = orderItemRepository.findByOrder_Id(order.getId());
+        for (OrderItem item : items) {
+            Product product = item.getProduct();
+            
+            // 1. Update detailed StoreBatch first
+            List<OrderItemBatch> allocatedBatches = orderItemBatchRepository.findByOrderItem_Id(item.getId());
+            for (OrderItemBatch oib : allocatedBatches) {
+                StoreBatch sb = storeBatchRepository.findByStoreIdAndProductIdAndBatchId(store.getId(), product.getId(), oib.getBatch().getId())
+                        .orElse(StoreBatch.builder()
+                                .store(store)
+                                .product(product)
+                                .batch(oib.getBatch())
+                                .quantity(0)
+                                .expiryDate(oib.getBatch().getExpiryDate())
+                                .build());
+                
+                sb.setQuantity(sb.getQuantity() + oib.getQuantity());
+                sb.setUpdatedAt(now);
+                storeBatchRepository.save(sb);
+            }
+
+            // 2. Update aggregated StoreInventory
+            StoreInventory inventory = storeInventoryRepository.findByStoreIdAndProductId(store.getId(), product.getId())
+                    .orElse(StoreInventory.builder()
+                            .store(store)
+                            .product(product)
+                            .quantity(0)
+                            .unit(item.getUnit())
+                            .minStock(0)
+                            .build());
+            
+            inventory.setQuantity(inventory.getQuantity() + item.getQuantity());
+            inventory.setUpdatedAt(now);
+            
+            // Update aggregate expiry date (earliest) based on all batches including new ones
+            List<StoreBatch> allStoreBatches = storeBatchRepository.findByStoreIdAndProductId(store.getId(), product.getId());
+            LocalDate earliestExpiry = allStoreBatches.stream()
+                    .map(StoreBatch::getExpiryDate)
+                    .filter(java.util.Objects::nonNull)
+                    .min(LocalDate::compareTo)
+                    .orElse(null);
+            inventory.setExpiryDate(earliestExpiry);
+            
+            storeInventoryRepository.save(inventory);
+        }
     }
 
     @Override
@@ -282,6 +344,31 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
         }
 
         return storeInventoryRepository.findAll(spec, pageRequest).map(this::toInventoryResponse);
+    }
+
+    @Override
+    public Page<StoreBatchResponse> getStoreInventoryBatches(String productId, String productName, Principal principal, int page, int size) {
+        Store userStore = getCurrentStore(principal);
+        if (userStore == null) {
+            throw new IllegalStateException("Only store staff can view their batch inventory");
+        }
+        String finalStoreId = userStore.getId();
+
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "expiryDate"));
+
+        Specification<StoreBatch> spec = Specification.where((root, query, cb) -> 
+                cb.equal(root.get("store").get("id"), finalStoreId));
+
+        if (productId != null && !productId.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("product").get("id"), productId));
+        }
+
+        if (productName != null && !productName.isBlank()) {
+            String searchPattern = "%" + productName.toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("product").get("name")), searchPattern));
+        }
+
+        return storeBatchRepository.findAll(spec, pageRequest).map(this::toStoreBatchResponse);
     }
 
     @Override
@@ -456,6 +543,21 @@ public class FranchiseStoreServiceImpl implements FranchiseStoreService {
                 .expiryDate(inv.getExpiryDate())
                 .updatedAt(inv.getUpdatedAt())
                 .lowStock(inv.getQuantity() <= inv.getMinStock())
+                .build();
+    }
+
+    private StoreBatchResponse toStoreBatchResponse(StoreBatch sb) {
+        return StoreBatchResponse.builder()
+                .id(sb.getId())
+                .productId(sb.getProduct().getId())
+                .productName(sb.getProduct().getName())
+                .batchId(sb.getBatch().getId())
+                .quantity(sb.getQuantity())
+                .unit(sb.getProduct().getUnit())
+                .expiryDate(sb.getExpiryDate())
+                .kitchenId(sb.getBatch().getKitchen().getId())
+                .kitchenName(sb.getBatch().getKitchen().getName())
+                .updatedAt(sb.getUpdatedAt())
                 .build();
     }
 

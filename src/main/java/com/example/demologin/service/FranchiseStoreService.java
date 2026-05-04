@@ -9,6 +9,7 @@ import com.example.demologin.dto.response.OrderResponse;
 import com.example.demologin.dto.response.OrderTimelineResponse;
 import com.example.demologin.dto.response.StoreOverviewResponse;
 import com.example.demologin.dto.response.StoreInventoryResponse;
+import com.example.demologin.dto.response.StoreBatchResponse;
 import com.example.demologin.dto.response.StoreResponse;
 import org.springframework.data.domain.Page;
 
@@ -24,6 +25,7 @@ public interface FranchiseStoreService {
     DeliveryResponse confirmReceipt(String deliveryId, ConfirmReceiptRequest request);
     DeliveryResponse confirmReceiptByOrderId(String orderId, ConfirmReceiptRequest request, Principal principal);
     Page<StoreInventoryResponse> getStoreInventory(String productId, String productName, Principal principal, int page, int size);
+    Page<StoreBatchResponse> getStoreInventoryBatches(String productId, String productName, Principal principal, int page, int size);
     StoreResponse getMyStore(Principal principal);
     StoreOverviewResponse getOverview(Principal principal);
     List<String> getOrderStatuses();

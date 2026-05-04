@@ -36,6 +36,8 @@ import com.example.demologin.repository.ProductionPlanRepository;
 import com.example.demologin.repository.RecipeRepository;
 import com.example.demologin.repository.StoreRepository;
 import com.example.demologin.repository.UserRepository;
+import com.example.demologin.repository.OrderItemBatchRepository;
+import com.example.demologin.entity.OrderItemBatch;
 import com.example.demologin.service.CentralKitchenService;
 import com.example.demologin.service.IngredientBatchService;
 import lombok.RequiredArgsConstructor;
@@ -108,12 +110,15 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
     private final PlanIngredientRepository planIngredientRepository;
     private final PlanIngredientBatchUsageRepository planIngredientBatchUsageRepository;
     private final BatchRepository batchRepository;
+    private final OrderItemBatchRepository orderItemBatchRepository;
     private final IngredientBatchService ingredientBatchService;
     private final ProductMapper productMapper;
 
     @Override
     public Page<OrderResponse> getAllOrders(String status, String storeId, int page, int size, Principal principal) {
-        validateCentralKitchenStaff(principal);
+        User currentUser = getCurrentCentralKitchenStaff(principal);
+        Kitchen currentKitchen = currentUser.getKitchen();
+        String currentKitchenId = (currentKitchen != null) ? currentKitchen.getId() : null;
 
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
@@ -128,16 +133,25 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
             throw new NotFoundException("Store not found: " + normalizedStoreId);
         }
 
-        Page<Order> orders;
-        if (normalizedStatus != null && normalizedStoreId != null) {
-            orders = orderRepository.findByStore_IdAndStatus(normalizedStoreId, normalizedStatus, pageRequest);
-        } else if (normalizedStatus != null) {
-            orders = orderRepository.findByStatus(normalizedStatus, pageRequest);
-        } else if (normalizedStoreId != null) {
-            orders = orderRepository.findByStore_Id(normalizedStoreId, pageRequest);
-        } else {
-            orders = orderRepository.findAll(pageRequest);
+        Specification<Order> spec = Specification.where(null);
+
+        if (normalizedStatus != null) {
+            spec = spec.and(hasStatus(normalizedStatus));
         }
+
+        if (normalizedStoreId != null) {
+            spec = spec.and(hasStoreId(normalizedStoreId));
+        }
+
+        // Logic: Show orders that are either unassigned OR assigned to this kitchen
+        if (currentKitchenId != null) {
+            spec = spec.and(Specification.where(kitchenIsNull()).or(hasKitchenId(currentKitchenId)));
+        } else {
+            // Staff without kitchen can only see unassigned orders
+            spec = spec.and(kitchenIsNull());
+        }
+
+        Page<Order> orders = orderRepository.findAll(spec, pageRequest);
 
         return orders.map(order -> {
             List<OrderItem> items = orderItemRepository.findByOrder_Id(order.getId());
@@ -147,10 +161,17 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
 
     @Override
     public OrderResponse getOrderById(String orderId, Principal principal) {
-        validateCentralKitchenStaff(principal);
+        User currentUser = getCurrentCentralKitchenStaff(principal);
+        Kitchen currentKitchen = currentUser.getKitchen();
+        String currentKitchenId = (currentKitchen != null) ? currentKitchen.getId() : null;
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
+
+        if (order.getKitchen() != null && currentKitchenId != null && !order.getKitchen().getId().equals(currentKitchenId)) {
+            throw new BadRequestException("This order is assigned to another kitchen and cannot be viewed");
+        }
+
         List<OrderItem> items = orderItemRepository.findByOrder_Id(orderId);
         return toOrderResponse(order, items);
     }
@@ -166,6 +187,10 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
+
+        if (order.getKitchen() != null && !order.getKitchen().getId().equals(kitchen.getId())) {
+            throw new BadRequestException("Order has already been accepted by another kitchen");
+        }
 
         OrderStatus currentStatus = order.getStatus();
         if (currentStatus != OrderStatus.PENDING && currentStatus != OrderStatus.ASSIGNED) {
@@ -187,10 +212,16 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
     @Override
     @Transactional
     public OrderResponse updateOrderStatus(String orderId, UpdateOrderStatusRequest request, Principal principal) {
-        validateCentralKitchenStaff(principal);
+        User currentUser = getCurrentCentralKitchenStaff(principal);
+        Kitchen kitchen = currentUser.getKitchen();
+        String kitchenId = (kitchen != null) ? kitchen.getId() : null;
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
+
+        if (order.getKitchen() != null && kitchenId != null && !order.getKitchen().getId().equals(kitchenId)) {
+            throw new BadRequestException("This order is managed by another kitchen and cannot be updated");
+        }
 
         OrderStatus currentStatus = order.getStatus();
         OrderStatus newStatus = request.getStatus();
@@ -676,6 +707,10 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
         return (root, query, cb) -> cb.equal(root.get("status"), status);
     }
 
+    private Specification<Order> hasStoreId(String storeId) {
+        return (root, query, cb) -> cb.equal(root.get("store").get("id"), storeId);
+    }
+
     private Specification<Order> hasStatuses(List<OrderStatus> statuses) {
         return (root, query, cb) -> root.get("status").in(statuses);
     }
@@ -1036,6 +1071,8 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
                 if (remainingToDeduct <= 0) break;
 
                 int batchRemaining = batch.getRemainingQuantity();
+                int deductedFromThisBatch = Math.min(batchRemaining, remainingToDeduct);
+                
                 if (batchRemaining <= remainingToDeduct) {
                     remainingToDeduct -= batchRemaining;
                     batch.setRemainingQuantity(0);
@@ -1043,10 +1080,17 @@ public class CentralKitchenServiceImpl implements CentralKitchenService {
                 } else {
                     batch.setRemainingQuantity(batchRemaining - remainingToDeduct);
                     remainingToDeduct = 0;
-                    batch.setStatus("PART_DIST");
+                    batch.setStatus("PARTIALLY_DISTRIBUTED");
                 }
                 batch.setUpdatedAt(LocalDateTime.now());
                 batchRepository.save(batch);
+
+                // Record the link between OrderItem and Batch for traceability
+                orderItemBatchRepository.save(OrderItemBatch.builder()
+                        .orderItem(item)
+                        .batch(batch)
+                        .quantity(deductedFromThisBatch)
+                        .build());
             }
         }
     }

@@ -170,6 +170,29 @@ public class FranchiseStoreController {
         return franchiseStoreService.getStoreInventory(productId, productName, principal, page, size);
     }
 
+    @GetMapping("/inventory/batches")
+    @PageResponse
+    @ApiResponse(message = "Detailed store batch inventory retrieved successfully")
+    @SecuredEndpoint("STORE_INVENTORY_VIEW")
+    @Operation(
+            summary = "Xem chi tiết lô hàng tồn kho",
+            description = "Xem chi tiết tồn kho tại cửa hàng theo từng lô hàng (Batch). " +
+                    "Bao gồm thông tin: lô nào, ngày hết hạn, số lượng, nhập từ bếp nào."
+    )
+    public Object getStoreInventoryBatches(
+            @Parameter(description = "Product ID to search for", example = "PROD001")
+            @RequestParam(required = false) String productId,
+            @Parameter(description = "Product name to search for (partial match)", example = "Bánh")
+            @RequestParam(required = false) String productName,
+            @Parameter(description = "Page index (0-based)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "20")
+            @RequestParam(defaultValue = "20") int size,
+            Principal principal
+    ) {
+        return franchiseStoreService.getStoreInventoryBatches(productId, productName, principal, page, size);
+    }
+
     // ==================== Store Information ====================
 
     @GetMapping("/my-store")
